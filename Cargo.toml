@@ -1,0 +1,35 @@
+[package]
+name = "linear-firmware"
+version = "0.1.0"
+authors = ["Ben Wang <wangben3@gmail.com>"]
+edition = "2018"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+members = ["lib/foc"]
+
+[dependencies]
+heapless = "0.7.5"
+usb-device = "0.2.5"
+usbd-serial = "0.1.0"
+micromath = "2"
+cortex-m-rtic = "1.0"
+cortex-m = "0.7"
+dwt-systick-monotonic = "1.0"
+rtt-target = { version = "0.3.1", features = ["cortex-m"] }
+panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
+bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
+libm = "0.2.0"
+foc = { path = "lib/foc" }
+
+[dependencies.stm32f4xx-hal]
+version = "0.13.2"
+features = ["rt", "stm32f411", "otg-fs", "usb_fs"]
+
+[profile.release]
+debug = 2
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
+

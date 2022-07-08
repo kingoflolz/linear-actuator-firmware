@@ -1,0 +1,11 @@
+[target.thumbv7em-none-eabihf]
+runner = 'probe-run --chip STM32F411CEUx'
+rustflags = [
+    "-C", "link-arg=-Tlink.x",
+]
+
+[profile.dev]
+debug = 1 # default is `true`; not needed if not already overridden
+
+[profile.release]
+debug = 1 # default is `false`; using `true` is also OK as symbols reside on the host, not the target
