@@ -13,7 +13,7 @@ pub enum EncoderCalibrationStatus {
 }
 
 impl EncoderCalibrationStatus {
-    pub fn next(&mut self, update: &ControllerUpdate, config: &Config) -> ControllerOutput{
+    pub fn next(&mut self, update: &ControllerUpdate, config: &Config) {
         match self {
             EncoderCalibrationStatus::Start => {}
             EncoderCalibrationStatus::Move1 { .. } => {}

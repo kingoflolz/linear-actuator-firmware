@@ -23,6 +23,7 @@ mod app {
     };
 
     use foc::svm;
+    use foc::state_machine::PWMCommand;
 
     use heapless::spsc::{Consumer, Producer, Queue};
 
@@ -37,7 +38,7 @@ mod app {
     use foc::svm::IterativeSVM;
     use bincode::{config::*, Decode, Encode};
     use stm32f4xx_hal::hal::digital::v2::IoPin;
-    use stm32f4xx_hal::timer::PwmChannel;
+    use stm32f4xx_hal::timer::*;
 
     use libm;
 
@@ -47,6 +48,20 @@ mod app {
         id: u16,
         adc: [u16; 10],
         pwm: [u16; 3]
+    }
+
+    pub struct PWMChannels {
+        u: PwmChannel<TIM1, 0_u8>,
+        v: PwmChannel<TIM1, 1_u8>,
+        w: PwmChannel<TIM1, 2_u8>,
+    }
+
+    impl PWMChannels {
+        fn set_duty(&mut self, u: u16, v: u16, w: u16) {
+            self.u.set_duty(u);
+            self.v.set_duty(v);
+            self.w.set_duty(w);
+        }
     }
 
     const MONO_HZ: u32 = 100_000_000;
@@ -69,24 +84,27 @@ mod app {
         sample_id: u32,
         p: Producer<'static, Sample, 64>,
         c: Consumer<'static, Sample, 64>,
+
+        timer_p: Producer<'static, PWMCommand, 32>,
+        timer_c: Consumer<'static, PWMCommand, 32>,
+
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 10]>,
         svm: IterativeSVM,
-        u: PwmChannel<TIM1, 0_u8>,
-        v: PwmChannel<TIM1, 1_u8>,
-        w: PwmChannel<TIM1, 2_u8>,
+        pwm: PWMChannels,
     }
 
     #[init(local = [adc_buffer_: [u16; 10] = [0; 10],
     adc_buffer2: [u16; 10] = [0; 10],
     ep_memory: [u32; 1024] = [0; 1024],
     usb_bus: Option < UsbBusAllocator < UsbBus < USB >> > = None,
-    q: Queue < Sample, 64 > = Queue::new()])]
+    q: Queue < Sample, 64 > = Queue::new(),
+    timer_q: Queue<PWMCommand, 32> = Queue::new()])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         rtt_init_print!();
 
         rprintln!("init");
-        let device: pac::Peripherals = cx.device;
+        let mut device: pac::Peripherals = cx.device;
 
         let rcc = device.RCC.constrain();
         let clocks = rcc
@@ -100,7 +118,7 @@ mod app {
             .freeze();
         rprintln!("hse");
 
-        let mut timer = device.TIM2.counter(&clocks);
+        let mut ctrl_timer = device.TIM2.counter(&clocks);
 
         unsafe {
             let tim = &(*TIM2::ptr());
@@ -140,6 +158,8 @@ mod app {
 
         // PWM enable
         gpiob.pb15.into_push_pull_output().set_high();
+
+        // let mut moc_timer = device.TIM1.counter::<200000>(&clocks);
 
         let (mut ch_u, mut ch_v, mut ch_w) = device
             .TIM1
@@ -194,14 +214,16 @@ mod app {
         let mut usb_pull = gpioa.pa15.into_push_pull_output();
 
         usb_pull.set_low();
-        timer.start(10.millis()).unwrap();
-        block!(timer.wait()).unwrap();
+        ctrl_timer.start(10.millis()).unwrap();
+        block!(ctrl_timer.wait()).unwrap();
         usb_pull.set_high();
 
-        timer
+        ctrl_timer
             .start(Duration::<u32, 1, 2_000_000>::from_ticks(250))
             .unwrap();
-        timer.listen(Event::Update);
+        ctrl_timer.listen(Event::Update);
+
+        // moc_timer.listen(Event::Update);
 
         let dma = StreamsTuple::new(device.DMA2);
         let config = DmaConfig::default()
@@ -280,6 +302,7 @@ mod app {
         rprintln!("spawned");
 
         let (p, c) = cx.local.q.split();
+        let (timer_p, timer_c) = cx.local.timer_q.split();
 
         (
             Shared { serial, usb_dev },
@@ -287,12 +310,16 @@ mod app {
                 sample_id: 0,
                 p,
                 c,
+                timer_p,
+                timer_c,
                 adc_buffer: Some(cx.local.adc_buffer_),
                 adc_transfer,
                 svm: IterativeSVM::new(40),
-                u: ch_u,
-                v: ch_v,
-                w: ch_w,
+                pwm: PWMChannels {
+                    u: ch_u,
+                    v: ch_v,
+                    w: ch_w,
+                }
             },
             init::Monotonics(mono),
         )
@@ -360,7 +387,12 @@ mod app {
         usb_idle_polling::spawn_after(500.micros()).ok();
     }
 
-    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, svm, u, v, w], priority = 10)]
+    // #[task(binds = TIM2, local = [], priority = 10)]
+    // fn tim2_irq(cx: tim2_irq::Context) {
+
+// }
+
+    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, svm, pwm], priority = 5)]
     fn dma(cx: dma::Context) {
         let dma::Context { local } = cx;
         let dma::LocalResources {
@@ -369,9 +401,7 @@ mod app {
             sample_id,
             adc_transfer,
             svm,
-            u,
-            v,
-            w,
+            pwm
         } = local;
         let (buffer, _) = adc_transfer
             .next_transfer(adc_buffer.take().unwrap())
@@ -385,11 +415,9 @@ mod app {
 
         let phase = position * 6.2831853071f32;
 
-        let (u_d, v_d, w_d) = svm.calculate(libm::sinf(phase), libm::cosf(phase));
+        let (u_d, v_d, w_d) = svm.calculate(libm::sinf(phase) * 0.5, libm::cosf(phase) * 0.5);
 
-        u.set_duty(u_d + 10);
-        v.set_duty(v_d + 10);
-        w.set_duty(w_d + 10);
+        pwm.set_duty(u_d + 10, v_d + 10, w_d + 10);
 
         let vbus_pin = buffer[8] as f32 / 4096.0 * 3.3;
         let vbus = vbus_pin * 10.0;

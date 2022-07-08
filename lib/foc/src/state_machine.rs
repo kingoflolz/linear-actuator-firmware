@@ -17,6 +17,13 @@ pub struct ControllerOutput {
     pub beta: f32,
 }
 
+pub struct PWMCommand {
+    pub driver_enable: bool,
+    pub u_duty: u16,
+    pub v_duty: u16,
+    pub w_duty: u16,
+}
+
 pub struct ControllerUpdate {
     pub u_current: f32,
     pub v_current: f32,
