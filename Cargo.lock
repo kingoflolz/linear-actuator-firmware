@@ -244,6 +244,9 @@ checksum = "723dce4e9f25b6e6c5f35628e144794e5b459216ed7da97b7c4b66cdb3fa82ca"
 [[package]]
 name = "foc"
 version = "0.1.0"
+dependencies = [
+ "libm",
+]
 
 [[package]]
 name = "fugit"

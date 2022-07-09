@@ -23,7 +23,7 @@ mod app {
     };
 
     use foc::svm;
-    use foc::state_machine::PWMCommand;
+    use foc::state_machine::{LowLevelControllerOutput, PWMCommand};
 
     use heapless::spsc::{Consumer, Producer, Queue};
 
@@ -57,10 +57,16 @@ mod app {
     }
 
     impl PWMChannels {
-        fn set_duty(&mut self, u: u16, v: u16, w: u16) {
-            self.u.set_duty(u);
-            self.v.set_duty(v);
-            self.w.set_duty(w);
+        fn set_duty(&mut self, pwm_req: &PWMCommand) {
+            if pwm_req.driver_enable {
+                self.u.set_duty(pwm_req.u_duty);
+                self.v.set_duty(pwm_req.v_duty);
+                self.w.set_duty(pwm_req.w_duty);
+            } else {
+                self.u.set_duty(0);
+                self.v.set_duty(0);
+                self.w.set_duty(0);
+            }
         }
     }
 
@@ -173,7 +179,8 @@ mod app {
                 &clocks,
             )
             .split();
-
+        let max_pwm = (100_000_000u32 / 200_000u32) as u16;
+        let max_mod = 40;
         // rprintln!("max duty: {}", max_duty);
 
         ch_u.set_duty(0);
@@ -314,7 +321,10 @@ mod app {
                 timer_c,
                 adc_buffer: Some(cx.local.adc_buffer_),
                 adc_transfer,
-                svm: IterativeSVM::new(40),
+                svm: IterativeSVM::new(
+                    max_pwm,
+                    max_mod
+                ),
                 pwm: PWMChannels {
                     u: ch_u,
                     v: ch_v,
@@ -415,9 +425,17 @@ mod app {
 
         let phase = position * 6.2831853071f32;
 
-        let (u_d, v_d, w_d) = svm.calculate(libm::sinf(phase) * 0.5, libm::cosf(phase) * 0.5);
+        let mod_frac = 0.1;
 
-        pwm.set_duty(u_d + 10, v_d + 10, w_d + 10);
+        let req = LowLevelControllerOutput {
+            driver_enable: true,
+            alpha: libm::sinf(phase) * mod_frac,
+            beta: libm::cosf(phase) * mod_frac
+        };
+
+        let pwm_req = svm.calculate(req);
+
+        pwm.set_duty(&pwm_req);
 
         let vbus_pin = buffer[8] as f32 / 4096.0 * 3.3;
         let vbus = vbus_pin * 10.0;
@@ -426,7 +444,7 @@ mod app {
             magic: 0xffff,
             id: (*sample_id % (1 << 15)) as u16,
             adc: *buffer,
-            pwm: [u_d, v_d, w_d],
+            pwm: pwm_req.to_array(),
         }));
 
         *sample_id = sample_id.wrapping_add(1);

@@ -1,4 +1,8 @@
-use crate::calibration::EncoderCalibrationStatus;
+pub struct LowLevelControllerOutput {
+    pub driver_enable: bool,
+    pub alpha: f32,
+    pub beta: f32,
+}
 
 struct Controller {
     state: ControllerState,
@@ -6,15 +10,8 @@ struct Controller {
 
 enum ControllerState {
     Idle,
-    EncoderCalibration(EncoderCalibrationStatus),
     Running,
     Fault,
-}
-
-pub struct ControllerOutput {
-    pub driver_enable: bool,
-    pub alpha: f32,
-    pub beta: f32,
 }
 
 pub struct PWMCommand {
@@ -22,6 +19,12 @@ pub struct PWMCommand {
     pub u_duty: u16,
     pub v_duty: u16,
     pub w_duty: u16,
+}
+
+impl PWMCommand {
+    pub fn to_array(&self) -> [u16; 3] {
+        [self.u_duty, self.v_duty, self.w_duty]
+    }
 }
 
 pub struct ControllerUpdate {

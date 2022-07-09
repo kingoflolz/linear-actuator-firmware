@@ -1,7 +1,4 @@
-pub struct IterativeSVM {
-    pub  residuals: [f32; 3],
-    max: u16,
-}
+use crate::state_machine::{LowLevelControllerOutput, PWMCommand};
 
 // inputs are alpha and beta voltages as fraction of vbus, outputs are duty cycles
 fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
@@ -141,25 +138,30 @@ fn round(x: f32) -> u16 {
     return (x + 0.5f32) as u16;
 }
 
+pub struct IterativeSVM {
+    pub residuals: [f32; 3],
+    max: u16, // maximum modulation index, taking into account dead time etc
+    cycle_time: u16, // theoretical max modulation
+}
+
 impl IterativeSVM {
-    pub fn new(max: u16) -> IterativeSVM {
+    pub fn new(max: u16, cycle_time: u16) -> IterativeSVM {
         IterativeSVM {
             residuals: [0.0; 3],
             max,
+            cycle_time,
         }
     }
 
     // voltage in, duty cycle out
-    pub fn calculate(&mut self, alpha: f32, beta: f32) -> (u16, u16, u16) {
-        let (t_a, t_b, t_c, result_valid) = calculate_svm(alpha, beta);
+    pub fn calculate(&mut self, request: LowLevelControllerOutput) -> PWMCommand {
+        let (t_a, t_b, t_c, result_valid) = calculate_svm(request.alpha, request.beta);
 
-        if !result_valid {
-            return (0, 0, 0);
-        }
+        let result_valid = result_valid && request.driver_enable;
 
-        let t_a = t_a * self.max as f32;
-        let t_b = t_b * self.max as f32;
-        let t_c = t_c * self.max as f32;
+        let t_a = t_a * self.cycle_time as f32;
+        let t_b = t_b * self.cycle_time as f32;
+        let t_c = t_c * self.cycle_time as f32;
 
         let t_a_rounded = round(t_a + self.residuals[0]);
         let t_b_rounded = round(t_b + self.residuals[1]);
@@ -169,7 +171,12 @@ impl IterativeSVM {
         self.residuals[1] += t_b - t_b_rounded as f32;
         self.residuals[2] += t_c - t_c_rounded as f32;
 
-        (t_a_rounded, t_b_rounded, t_c_rounded)
+        PWMCommand {
+            driver_enable: result_valid,
+            u_duty: t_a_rounded,
+            v_duty: t_b_rounded,
+            w_duty: t_c_rounded
+        }
     }
 }
 
