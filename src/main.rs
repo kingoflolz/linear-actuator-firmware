@@ -35,17 +35,11 @@ mod app {
     use usb_device::prelude::*;
     use usbd_serial::CdcAcmClass;
 
-    use bincode::{config::*, Decode, Encode};
-
+    use bincode;
+    use framed;
     use libm;
 
-    #[derive(Encode)]
-    pub struct Sample {
-        magic: u16,
-        id: u16,
-        adc: [u16; 10],
-        pwm: [u16; 3]
-    }
+    use common::Sample;
 
     pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
@@ -359,10 +353,10 @@ mod app {
             loop {
                 match c.dequeue() {
                     Some(s) => {
-                        let mut slice = [0; 100];
+                        let mut buf = [0; 64];
                         let length = bincode::encode_into_slice(
                             s,
-                            &mut slice,
+                            &mut buf,
                             bincode::config::standard()
                                 .with_little_endian()
                                 .with_fixed_int_encoding()
@@ -370,10 +364,14 @@ mod app {
                         )
                         .unwrap();
 
-                        assert!(length < 64);
+                        let mut codec = framed::bytes::Config::default().to_codec();
+                        let mut encoded_buf = [0; 64];
+                        let encoded_len = codec.encode_to_slice(&buf, &mut encoded_buf[0..length]).unwrap();
+
+                        assert!(encoded_len < 64);
 
                         loop {
-                            match serial.write_packet(&slice[0..length]) {
+                            match serial.write_packet(&encoded_buf[0..encoded_len]) {
                                 Err(UsbError::WouldBlock) => {
                                     usb_dev.poll(&mut [serial]);
                                 },
@@ -432,7 +430,6 @@ mod app {
         pwm.set_duty(&pwm_req);
 
         drop(p.enqueue(Sample {
-            magic: 0xffff,
             id: (*sample_id % (1 << 15)) as u16,
             adc: *buffer,
             pwm: pwm_req.to_array(),
