@@ -5,21 +5,25 @@ use panic_rtt_target as _;
 
 #[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [EXTI0])]
 mod app {
-    use core::convert::TryInto;
     use dwt_systick_monotonic::DwtSystick;
+    use dwt_systick_monotonic::fugit::Duration;
+
     use rtt_target::{self, rprintln, rtt_init_print};
     use stm32f4xx_hal::{
         adc::{
             Adc,
-            config::{AdcConfig, Dma, SampleTime, Scan, Sequence}, Temperature,
+            config::{AdcConfig, Dma, SampleTime, Scan, Sequence, Clock, ExternalTrigger, TriggerMode},
+            Temperature,
         },
         dma::{config::DmaConfig, PeripheralToMemory, Stream0, StreamsTuple, Transfer},
         nb::block,
         otg_fs::{USB, UsbBus, UsbBusType},
-        pac::{self, ADC1, DMA2},
+        pac::{self, ADC1, DMA2, TIM1, TIM2},
         prelude::*,
         signature::{VtempCal110, VtempCal30},
-        timer::{Event, Timer},
+        timer::*,
+        gpio::{Output, Pin},
+        hal::digital::v2::IoPin,
     };
 
     use foc::state_machine::{ControllerUpdate, LowLevelControllerOutput, PWMCommand, Controller};
@@ -27,20 +31,13 @@ mod app {
 
     use heapless::spsc::{Consumer, Producer, Queue};
 
-    use dwt_systick_monotonic::fugit::Duration;
-    use stm32f4xx_hal::adc::config::{Clock, ExternalTrigger, TriggerMode};
-    use stm32f4xx_hal::pac::{TIM1, TIM2};
-
     use usb_device::bus::UsbBusAllocator;
     use usb_device::prelude::*;
-    use usbd_serial::SerialPort;
+    use usbd_serial::CdcAcmClass;
 
     use bincode::{config::*, Decode, Encode};
-    use stm32f4xx_hal::hal::digital::v2::IoPin;
-    use stm32f4xx_hal::timer::*;
 
     use libm;
-    use stm32f4xx_hal::gpio::{Output, Pin};
 
     #[derive(Encode)]
     pub struct Sample {
@@ -108,7 +105,7 @@ mod app {
 
     #[shared]
     struct Shared {
-        serial: SerialPort<'static, UsbBusType>,
+        serial: CdcAcmClass<'static, UsbBusType>,
         usb_dev: UsbDevice<'static, UsbBusType>,
     }
 
@@ -202,9 +199,6 @@ mod app {
                 &clocks,
             )
             .split();
-        let max_pwm = (100_000_000u32 / 200_000u32) as u16;
-        let max_mod = 40;
-        // rprintln!("max duty: {}", max_duty);
 
         ch_u.set_duty(0);
         ch_v.set_duty(0);
@@ -226,7 +220,7 @@ mod app {
         cx.local
             .usb_bus
             .replace(UsbBusType::new(usb, cx.local.ep_memory));
-        let serial = usbd_serial::SerialPort::new(cx.local.usb_bus.as_ref().unwrap());
+        let serial = CdcAcmClass::new(cx.local.usb_bus.as_ref().unwrap(), 64);
 
         let mut usb_dev = UsbDeviceBuilder::new(
             cx.local.usb_bus.as_ref().unwrap(),
@@ -357,7 +351,7 @@ mod app {
     }
 
     fn poll_usb(
-        serial: &mut SerialPort<'static, UsbBusType>,
+        serial: &mut CdcAcmClass<'static, UsbBusType>,
         usb_dev: &mut UsbDevice<'static, UsbBusType>,
         queue: Option<&mut Consumer<'static, Sample, 64>>,
     ) {
@@ -376,17 +370,15 @@ mod app {
                         )
                         .unwrap();
 
-                        assert_eq!(length, 30);
+                        assert!(length < 64);
 
-                        let mut write_offset = 0;
-                        while write_offset < length {
-                            match serial.write(&slice[write_offset..length]) {
-                                Ok(len) if len > 0 => {
-                                    write_offset += len;
-                                }
-                                _ => {}
+                        loop {
+                            match serial.write_packet(&slice[0..length]) {
+                                Err(UsbError::WouldBlock) => {
+                                    usb_dev.poll(&mut [serial]);
+                                },
+                                _ => { break }
                             }
-                            usb_dev.poll(&mut [serial]);
                         }
                     }
                     None => {
@@ -411,7 +403,7 @@ mod app {
         let usb_idle_polling::Context { shared, local } = cx;
 
         (shared.serial, shared.usb_dev).lock(
-            |serial: &mut SerialPort<_>, usb_dev: &mut UsbDevice<_>| {
+            |serial: &mut CdcAcmClass<_>, usb_dev: &mut UsbDevice<_>| {
                 poll_usb(serial, usb_dev, Some(local.c))
             },
         );
