@@ -140,15 +140,15 @@ fn round(x: f32) -> u16 {
 
 pub struct IterativeSVM {
     pub residuals: [f32; 3],
-    max: u16, // maximum modulation index, taking into account dead time etc
+    dead_time: u16, // dead time in duty cycle
     cycle_time: u16, // theoretical max modulation
 }
 
 impl IterativeSVM {
-    pub fn new(max: u16, cycle_time: u16) -> IterativeSVM {
+    pub fn new(dead_time: u16, cycle_time: u16) -> IterativeSVM {
         IterativeSVM {
             residuals: [0.0; 3],
-            max,
+            dead_time,
             cycle_time,
         }
     }
@@ -157,7 +157,7 @@ impl IterativeSVM {
     pub fn calculate(&mut self, request: LowLevelControllerOutput) -> PWMCommand {
         let (t_a, t_b, t_c, result_valid) = calculate_svm(request.alpha, request.beta);
 
-        let result_valid = result_valid && request.driver_enable;
+        let mut result_valid = result_valid && request.driver_enable;
 
         let t_a = t_a * self.cycle_time as f32;
         let t_b = t_b * self.cycle_time as f32;
@@ -171,11 +171,15 @@ impl IterativeSVM {
         self.residuals[1] += t_b - t_b_rounded as f32;
         self.residuals[2] += t_c - t_c_rounded as f32;
 
+        result_valid &= t_a_rounded + self.dead_time < self.cycle_time;
+        result_valid &= t_b_rounded + self.dead_time < self.cycle_time;
+        result_valid &= t_c_rounded + self.dead_time < self.cycle_time;
+
         PWMCommand {
             driver_enable: result_valid,
-            u_duty: t_a_rounded,
-            v_duty: t_b_rounded,
-            w_duty: t_c_rounded
+            u_duty: t_a_rounded + self.dead_time,
+            v_duty: t_b_rounded + self.dead_time,
+            w_duty: t_c_rounded + self.dead_time
         }
     }
 }

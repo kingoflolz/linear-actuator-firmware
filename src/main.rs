@@ -22,8 +22,8 @@ mod app {
         timer::{Event, Timer},
     };
 
-    use foc::svm;
-    use foc::state_machine::{LowLevelControllerOutput, PWMCommand};
+    use foc::state_machine::{ControllerUpdate, LowLevelControllerOutput, PWMCommand, Controller};
+    use foc::config::Config;
 
     use heapless::spsc::{Consumer, Producer, Queue};
 
@@ -35,12 +35,12 @@ mod app {
     use usb_device::prelude::*;
     use usbd_serial::SerialPort;
 
-    use foc::svm::IterativeSVM;
     use bincode::{config::*, Decode, Encode};
     use stm32f4xx_hal::hal::digital::v2::IoPin;
     use stm32f4xx_hal::timer::*;
 
     use libm;
+    use stm32f4xx_hal::gpio::{Output, Pin};
 
     #[derive(Encode)]
     pub struct Sample {
@@ -50,22 +50,49 @@ mod app {
         pwm: [u16; 3]
     }
 
-    pub struct PWMChannels {
+    pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
         v: PwmChannel<TIM1, 1_u8>,
         w: PwmChannel<TIM1, 2_u8>,
+        pwm_en: Pin<'B', 15_u8, Output>,
     }
 
-    impl PWMChannels {
+    fn adc_buf_to_controller_update(adc_buf: &[u16; 10]) -> ControllerUpdate {
+        fn adc_to_voltage(adc: u16) -> f32 {
+            adc as f32 / 4096.0 * 3.3
+        }
+
+        let vbus_s_pin = adc_to_voltage(adc_buf[8]);
+
+        // 10k:1k voltage divider
+        let vbus = vbus_s_pin * 11.0;
+
+        // 66.6mv/A
+        fn adc_to_current(adc: u16) -> f32 {
+            (adc as i32 - 2048) as f32 / 4096.0 * 3.3 / 0.0666
+        }
+
+        ControllerUpdate {
+            u_current: adc_to_current(adc_buf[5]),
+            v_current: adc_to_current(adc_buf[6]),
+            w_current: adc_to_current(adc_buf[7]),
+            bus_voltage: vbus,
+            position: None
+        }
+    }
+
+    impl MotorOutputBlock {
         fn set_duty(&mut self, pwm_req: &PWMCommand) {
             if pwm_req.driver_enable {
                 self.u.set_duty(pwm_req.u_duty);
                 self.v.set_duty(pwm_req.v_duty);
                 self.w.set_duty(pwm_req.w_duty);
+                self.pwm_en.set_high();
             } else {
                 self.u.set_duty(0);
                 self.v.set_duty(0);
                 self.w.set_duty(0);
+                self.pwm_en.set_low();
             }
         }
     }
@@ -96,8 +123,9 @@ mod app {
 
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 10]>,
-        svm: IterativeSVM,
-        pwm: PWMChannels,
+        controller: Controller,
+        config: Config,
+        pwm: MotorOutputBlock,
     }
 
     #[init(local = [adc_buffer_: [u16; 10] = [0; 10],
@@ -162,11 +190,6 @@ mod app {
         gpiob.pb8.into_push_pull_output().set_high();
         gpiob.pb9.into_push_pull_output().set_high();
 
-        // PWM enable
-        gpiob.pb15.into_push_pull_output().set_high();
-
-        // let mut moc_timer = device.TIM1.counter::<200000>(&clocks);
-
         let (mut ch_u, mut ch_v, mut ch_w) = device
             .TIM1
             .pwm_hz(
@@ -229,8 +252,6 @@ mod app {
             .start(Duration::<u32, 1, 2_000_000>::from_ticks(250))
             .unwrap();
         ctrl_timer.listen(Event::Update);
-
-        // moc_timer.listen(Event::Update);
 
         let dma = StreamsTuple::new(device.DMA2);
         let config = DmaConfig::default()
@@ -310,7 +331,8 @@ mod app {
 
         let (p, c) = cx.local.q.split();
         let (timer_p, timer_c) = cx.local.timer_q.split();
-
+        let config = Config::new();
+        let controller = Controller::new(&config);
         (
             Shared { serial, usb_dev },
             Local {
@@ -321,14 +343,13 @@ mod app {
                 timer_c,
                 adc_buffer: Some(cx.local.adc_buffer_),
                 adc_transfer,
-                svm: IterativeSVM::new(
-                    max_pwm,
-                    max_mod
-                ),
-                pwm: PWMChannels {
+                config,
+                controller,
+                pwm: MotorOutputBlock {
                     u: ch_u,
                     v: ch_v,
                     w: ch_w,
+                    pwm_en: gpiob.pb15.into_push_pull_output()
                 }
             },
             init::Monotonics(mono),
@@ -397,12 +418,7 @@ mod app {
         usb_idle_polling::spawn_after(500.micros()).ok();
     }
 
-    // #[task(binds = TIM2, local = [], priority = 10)]
-    // fn tim2_irq(cx: tim2_irq::Context) {
-
-// }
-
-    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, svm, pwm], priority = 5)]
+    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, controller, config, pwm], priority = 5)]
     fn dma(cx: dma::Context) {
         let dma::Context { local } = cx;
         let dma::LocalResources {
@@ -410,35 +426,18 @@ mod app {
             p,
             sample_id,
             adc_transfer,
-            svm,
+            controller,
+            config,
             pwm
         } = local;
         let (buffer, _) = adc_transfer
             .next_transfer(adc_buffer.take().unwrap())
             .unwrap();
 
-        let amplitude = 3.0;
-        let frequency = 25000.0;
-
-        let position = libm::sinf(*sample_id as f32 / frequency) * amplitude;
-        let position = *sample_id as f32 / frequency;
-
-        let phase = position * 6.2831853071f32;
-
-        let mod_frac = 0.1;
-
-        let req = LowLevelControllerOutput {
-            driver_enable: true,
-            alpha: libm::sinf(phase) * mod_frac,
-            beta: libm::cosf(phase) * mod_frac
-        };
-
-        let pwm_req = svm.calculate(req);
+        let update = adc_buf_to_controller_update(&buffer);
+        let pwm_req = controller.update(&update, &config);
 
         pwm.set_duty(&pwm_req);
-
-        let vbus_pin = buffer[8] as f32 / 4096.0 * 3.3;
-        let vbus = vbus_pin * 10.0;
 
         drop(p.enqueue(Sample {
             magic: 0xffff,
