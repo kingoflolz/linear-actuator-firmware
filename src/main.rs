@@ -20,13 +20,12 @@ mod app {
         otg_fs::{USB, UsbBus, UsbBusType},
         pac::{self, ADC1, DMA2, TIM1, TIM2},
         prelude::*,
-        signature::{VtempCal110, VtempCal30},
+        // signature::{VtempCal110, VtempCal30},
         timer::*,
         gpio::{Output, Pin},
-        hal::digital::v2::IoPin,
     };
 
-    use foc::state_machine::{ControllerUpdate, LowLevelControllerOutput, PWMCommand, Controller};
+    use foc::state_machine::{PWMCommand, Controller};
     use foc::config::Config;
 
     use heapless::spsc::{Consumer, Producer, Queue};
@@ -37,39 +36,14 @@ mod app {
 
     use bincode;
     use framed;
-    use libm;
 
-    use common::Sample;
+    use common::*;
 
     pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
         v: PwmChannel<TIM1, 1_u8>,
         w: PwmChannel<TIM1, 2_u8>,
         pwm_en: Pin<'B', 15_u8, Output>,
-    }
-
-    fn adc_buf_to_controller_update(adc_buf: &[u16; 10]) -> ControllerUpdate {
-        fn adc_to_voltage(adc: u16) -> f32 {
-            adc as f32 / 4096.0 * 3.3
-        }
-
-        let vbus_s_pin = adc_to_voltage(adc_buf[8]);
-
-        // 10k:1k voltage divider
-        let vbus = vbus_s_pin * 11.0;
-
-        // 66.6mv/A
-        fn adc_to_current(adc: u16) -> f32 {
-            (adc as i32 - 2048) as f32 / 4096.0 * 3.3 / 0.0666
-        }
-
-        ControllerUpdate {
-            u_current: adc_to_current(adc_buf[5]),
-            v_current: adc_to_current(adc_buf[6]),
-            w_current: adc_to_current(adc_buf[7]),
-            bus_voltage: vbus,
-            position: None
-        }
     }
 
     impl MotorOutputBlock {
@@ -109,8 +83,8 @@ mod app {
         p: Producer<'static, Sample, 64>,
         c: Consumer<'static, Sample, 64>,
 
-        timer_p: Producer<'static, PWMCommand, 32>,
-        timer_c: Consumer<'static, PWMCommand, 32>,
+        // timer_p: Producer<'static, PWMCommand, 32>,
+        // timer_c: Consumer<'static, PWMCommand, 32>,
 
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 10]>,
@@ -129,7 +103,7 @@ mod app {
         rtt_init_print!();
 
         rprintln!("init");
-        let mut device: pac::Peripherals = cx.device;
+        let device: pac::Peripherals = cx.device;
 
         let rcc = device.RCC.constrain();
         let clocks = rcc
@@ -226,7 +200,7 @@ mod app {
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();
 
-        usb_dev.force_reset();
+        let _ = usb_dev.force_reset();
         rprintln!("usb dev start");
 
         let mut usb_pull = gpioa.pa15.into_push_pull_output();
@@ -318,7 +292,7 @@ mod app {
         rprintln!("spawned");
 
         let (p, c) = cx.local.q.split();
-        let (timer_p, timer_c) = cx.local.timer_q.split();
+        // let (timer_p, timer_c) = cx.local.timer_q.split();
         let config = Config::new();
         let controller = Controller::new(&config);
         (
@@ -327,8 +301,8 @@ mod app {
                 sample_id: 0,
                 p,
                 c,
-                timer_p,
-                timer_c,
+                // timer_p,
+                // timer_c,
                 adc_buffer: Some(cx.local.adc_buffer_),
                 adc_transfer,
                 config,

@@ -27,10 +27,7 @@ fn main() {
             Ok(frame) => {
                 let sample: Sample = bincode::decode_from_slice(
                     &frame,
-                    bincode::config::standard()
-                        .with_little_endian()
-                        .with_fixed_int_encoding()
-                        .skip_fixed_array_length(),
+                    bincode_config,
                 ).unwrap().0;
                 println!("{:?}", sample);
             },

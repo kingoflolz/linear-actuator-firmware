@@ -31,12 +31,6 @@ impl Controller {
     }
 }
 
-enum ControllerState {
-    Idle,
-    Running,
-    Fault,
-}
-
 pub struct PWMCommand {
     pub driver_enable: bool,
     pub u_duty: u16,
