@@ -340,7 +340,7 @@ mod app {
 
                         let mut codec = framed::bytes::Config::default().to_codec();
                         let mut encoded_buf = [0; 64];
-                        let encoded_len = codec.encode_to_slice(&buf, &mut encoded_buf[0..length]).unwrap();
+                        let encoded_len = codec.encode_to_slice(&buf[0..length], &mut encoded_buf).unwrap();
 
                         assert!(encoded_len < 64);
 
@@ -349,9 +349,14 @@ mod app {
                                 Err(UsbError::WouldBlock) => {
                                     usb_dev.poll(&mut [serial]);
                                 },
+                                Ok(_) => {
+                                    rprintln!("p");
+                                    break;
+                                }
                                 _ => { break }
                             }
                         }
+                        serial.write_packet(&[]);
                     }
                     None => {
                         break;
@@ -404,7 +409,7 @@ mod app {
         pwm.set_duty(&pwm_req);
 
         drop(p.enqueue(Sample {
-            id: (*sample_id % (1 << 15)) as u16,
+            id: *sample_id as u16,
             adc: *buffer,
             pwm: pwm_req.to_array(),
         }));

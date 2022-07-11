@@ -1,4 +1,5 @@
 use crate::state_machine::{LowLevelControllerOutput, PWMCommand};
+use rtt_target::{self, rprintln};
 
 // inputs are alpha and beta voltages as fraction of vbus, outputs are duty cycles
 fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
@@ -51,7 +52,7 @@ fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
             let t2 = two_by_sqrt3 * beta;
 
             // PWM timings
-            t_a = (1.0f32 - t1 - t2) * 0.5f32;
+            t_a = 0.0;
             t_b = t_a + t1;
             t_c = t_b + t2;
         }
@@ -63,7 +64,7 @@ fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
             let t3 = -alpha + one_by_sqrt3 * beta;
 
             // PWM timings
-            t_b = (1.0f32 - t2 - t3) * 0.5f32;
+            t_b = 0.0;
             t_a = t_b + t3;
             t_c = t_a + t2;
         }
@@ -75,7 +76,7 @@ fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
             let t4 = -alpha - one_by_sqrt3 * beta;
 
             // PWM timings
-            t_b = (1.0f32 - t3 - t4) * 0.5f32;
+            t_b = 0.0;
             t_c = t_b + t3;
             t_a = t_c + t4;
         }
@@ -87,7 +88,7 @@ fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
             let t5 = -two_by_sqrt3 * beta;
 
             // PWM timings
-            t_c = (1.0f32 - t4 - t5) * 0.5f32;
+            t_c = 0.0;
             t_b = t_c + t5;
             t_a = t_b + t4;
         }
@@ -99,7 +100,7 @@ fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
             let t6 = alpha - one_by_sqrt3 * beta;
 
             // PWM timings
-            t_c = (1.0f32 - t5 - t6) * 0.5f32;
+            t_c = 0.0;
             t_a = t_c + t5;
             t_b = t_a + t6;
         }
@@ -111,7 +112,7 @@ fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
             let t1 = alpha + one_by_sqrt3 * beta;
 
             // PWM timings
-            t_a = (1.0f32 - t6 - t1) * 0.5f32;
+            t_a = 0.0;
             t_c = t_a + t1;
             t_b = t_c + t6;
         }
@@ -138,6 +139,7 @@ fn round(x: f32) -> u16 {
     return (x + 0.5f32) as u16;
 }
 
+#[derive(Debug)]
 pub struct IterativeSVM {
     pub residuals: [f32; 3],
     dead_time: u16, // dead time in duty cycle
@@ -155,7 +157,11 @@ impl IterativeSVM {
 
     // voltage in, duty cycle out
     pub fn calculate(&mut self, request: LowLevelControllerOutput) -> PWMCommand {
+        // rprintln!("alpha: {}, beta: {}", request.alpha, request.beta);
+
         let (t_a, t_b, t_c, result_valid) = calculate_svm(request.alpha, request.beta);
+
+        // rprintln!("ta = {}, tb = {}, tc = {}", t_a, t_b, t_c);
 
         let mut result_valid = result_valid && request.driver_enable;
 
@@ -175,6 +181,7 @@ impl IterativeSVM {
         result_valid &= t_b_rounded + self.dead_time < self.cycle_time;
         result_valid &= t_c_rounded + self.dead_time < self.cycle_time;
 
+        use rtt_target::{self, rprintln};
         PWMCommand {
             driver_enable: result_valid,
             u_duty: t_a_rounded + self.dead_time,

@@ -1,6 +1,7 @@
 use libm::{cosf, sinf};
 use crate::config::Config;
 use crate::state_machine::{ControllerUpdate, LowLevelControllerOutput};
+use rtt_target::{self, rprintln};
 
 pub struct OpenLoopVelocityController {
     position: f32

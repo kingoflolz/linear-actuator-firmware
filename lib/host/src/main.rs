@@ -17,9 +17,11 @@ fn main() {
 
     let mut codec = framed::bytes::Config::default();
 
-    let port = serialport::new("/dev/ttyAMC0", 9600).open().unwrap();
+    let port = serialport::new("/dev/ttyACM0", 9600).open().unwrap();
 
     let mut receiver = codec.to_receiver(port);
+
+    let mut last_id: u16 = 0;
 
     loop {
         let frame = receiver.recv();
@@ -29,10 +31,19 @@ fn main() {
                     &frame,
                     bincode_config,
                 ).unwrap().0;
-                println!("{:?}", sample);
+                if sample.id != last_id.wrapping_add(1) {
+                    println!("sample mismatch: {} follows {}", sample.id, last_id);
+                }
+                last_id = sample.id;
+                if sample.id % 1000 == 0 {
+                    println!("{:?}", sample);
+                }
             },
-            Err(framed::Error::Io(_)) => {
-                break
+            Err(framed::Error::Io(e)) => {
+                if e.kind() != std::io::ErrorKind::TimedOut {
+                    println!("breaking from io error: {:?}", e);
+                    break
+                }
             },
             _ => {}
         }

@@ -18,7 +18,7 @@ impl Config {
         Config {
             calibration_length: 10.0,
             calibration_speed: 1.0,
-            calibration_voltage: 3.0,
+            calibration_voltage: 1.5,
             uvlo: 10.0,
             switching_frequency: 200e3,
             switching_clock_frequency: 100e6,

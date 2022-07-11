@@ -293,6 +293,7 @@ name = "foc"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "rtt-target",
 ]
 
 [[package]]

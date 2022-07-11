@@ -26,8 +26,12 @@ impl Controller {
     }
 
     pub fn update(&mut self, update: &ControllerUpdate, config: &Config) -> PWMCommand {
-        let open_loop_velocity_output = self.open_loop_velocity.process(0.01, update, config);
-        self.svm.calculate(open_loop_velocity_output)
+        let open_loop_velocity_output = self.open_loop_velocity.process(0.001, update, config);
+        let mut command = self.svm.calculate(open_loop_velocity_output);
+        if update.bus_voltage < config.uvlo {
+            command.driver_enable = false;
+        }
+        command
     }
 }
 
