@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::open_loop_velocity::OpenLoopVelocityController;
 use crate::svm::IterativeSVM;
 
-pub struct LowLevelControllerOutput {
+pub struct VoltageControllerOutput {
     pub driver_enable: bool,
     pub alpha: f32,
     pub beta: f32,

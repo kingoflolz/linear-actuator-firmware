@@ -1,5 +1,4 @@
-use crate::state_machine::{LowLevelControllerOutput, PWMCommand};
-use rtt_target::{self, rprintln};
+use crate::state_machine::{VoltageControllerOutput, PWMCommand};
 
 // inputs are alpha and beta voltages as fraction of vbus, outputs are duty cycles
 fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
@@ -156,7 +155,7 @@ impl IterativeSVM {
     }
 
     // voltage in, duty cycle out
-    pub fn calculate(&mut self, request: LowLevelControllerOutput) -> PWMCommand {
+    pub fn calculate(&mut self, request: VoltageControllerOutput) -> PWMCommand {
         // rprintln!("alpha: {}, beta: {}", request.alpha, request.beta);
 
         let (t_a, t_b, t_c, result_valid) = calculate_svm(request.alpha, request.beta);
@@ -181,7 +180,6 @@ impl IterativeSVM {
         result_valid &= t_b_rounded + self.dead_time < self.cycle_time;
         result_valid &= t_c_rounded + self.dead_time < self.cycle_time;
 
-        use rtt_target::{self, rprintln};
         PWMCommand {
             driver_enable: result_valid,
             u_duty: t_a_rounded + self.dead_time,

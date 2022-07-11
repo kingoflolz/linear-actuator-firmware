@@ -342,8 +342,6 @@ mod app {
                         let mut encoded_buf = [0; 64];
                         let encoded_len = codec.encode_to_slice(&buf[0..length], &mut encoded_buf).unwrap();
 
-                        assert!(encoded_len < 64);
-
                         loop {
                             match serial.write_packet(&encoded_buf[0..encoded_len]) {
                                 Err(UsbError::WouldBlock) => {
@@ -356,7 +354,7 @@ mod app {
                                 _ => { break }
                             }
                         }
-                        serial.write_packet(&[]);
+                        let _ = serial.write_packet(&[]);
                     }
                     None => {
                         break;

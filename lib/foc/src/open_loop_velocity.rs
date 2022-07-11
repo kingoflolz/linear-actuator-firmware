@@ -1,7 +1,6 @@
 use libm::{cosf, sinf};
 use crate::config::Config;
-use crate::state_machine::{ControllerUpdate, LowLevelControllerOutput};
-use rtt_target::{self, rprintln};
+use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 
 pub struct OpenLoopVelocityController {
     position: f32
@@ -15,7 +14,7 @@ impl OpenLoopVelocityController {
     }
 
     // units of velocity_req is electrical radians per controller timestep
-    pub fn process(&mut self, velocity_req: f32, update: &ControllerUpdate, config: &Config) -> LowLevelControllerOutput {
+    pub fn process(&mut self, velocity_req: f32, update: &ControllerUpdate, config: &Config) -> VoltageControllerOutput {
         let voltage = update.bus_voltage;
         let request_duty = config.calibration_voltage / voltage;
 
@@ -24,7 +23,7 @@ impl OpenLoopVelocityController {
 
         self.position += velocity_req;
 
-        LowLevelControllerOutput {
+        VoltageControllerOutput {
             driver_enable: true,
             alpha,
             beta
