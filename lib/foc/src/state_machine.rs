@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::open_loop_velocity::OpenLoopVelocityController;
 use crate::svm::IterativeSVM;
+use crate::calibration::EncoderCalibrationController;
 
 pub struct VoltageControllerOutput {
     pub driver_enable: bool,
@@ -10,7 +11,7 @@ pub struct VoltageControllerOutput {
 
 pub struct Controller {
     svm: IterativeSVM,
-    open_loop_velocity: OpenLoopVelocityController,
+    pub cal: EncoderCalibrationController,
 }
 
 impl Controller {
@@ -21,13 +22,14 @@ impl Controller {
         Controller {
             svm: IterativeSVM::new(dead_time_cycles as u16,
                                    cycle_time as u16),
-            open_loop_velocity: OpenLoopVelocityController::new(),
+            cal: EncoderCalibrationController::new(),
         }
     }
 
     pub fn update(&mut self, update: &ControllerUpdate, config: &Config) -> PWMCommand {
-        let open_loop_velocity_output = self.open_loop_velocity.process(0.001, update, config);
-        let mut command = self.svm.calculate(open_loop_velocity_output);
+        let voltage_output = self.cal.update( update, config);
+
+        let mut command = self.svm.calculate(voltage_output);
         if update.bus_voltage < config.uvlo {
             command.driver_enable = false;
         }

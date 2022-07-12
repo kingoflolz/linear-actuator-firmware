@@ -28,6 +28,8 @@ mod app {
     use foc::state_machine::{PWMCommand, Controller};
     use foc::config::Config;
 
+    use encoder::EncoderState;
+
     use heapless::spsc::{Consumer, Producer, Queue};
 
     use usb_device::bus::UsbBusAllocator;
@@ -38,6 +40,7 @@ mod app {
     use framed;
 
     use common::*;
+    use foc::calibration::EncoderCalibrationState;
 
     pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
@@ -89,6 +92,7 @@ mod app {
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 10]>,
         controller: Controller,
+        encoder: EncoderState,
         config: Config,
         pwm: MotorOutputBlock,
     }
@@ -307,6 +311,7 @@ mod app {
                 adc_transfer,
                 config,
                 controller,
+                encoder: EncoderState::new(),
                 pwm: MotorOutputBlock {
                     u: ch_u,
                     v: ch_v,
@@ -385,7 +390,7 @@ mod app {
         usb_idle_polling::spawn_after(500.micros()).ok();
     }
 
-    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, controller, config, pwm], priority = 5)]
+    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, controller, config, pwm, encoder], priority = 5)]
     fn dma(cx: dma::Context) {
         let dma::Context { local } = cx;
         let dma::LocalResources {
@@ -395,14 +400,21 @@ mod app {
             adc_transfer,
             controller,
             config,
+            encoder,
             pwm
         } = local;
         let (buffer, _) = adc_transfer
             .next_transfer(adc_buffer.take().unwrap())
             .unwrap();
 
+        let position = encoder.update([buffer[1] as f32, buffer[2] as f32, buffer[3] as f32, buffer[4] as f32]);
+
         let update = adc_buf_to_controller_update(&buffer);
         let pwm_req = controller.update(&update, &config);
+
+        if controller.cal.state == EncoderCalibrationState::Done {
+            encoder.calibration_done();
+        }
 
         pwm.set_duty(&pwm_req);
 
@@ -410,6 +422,7 @@ mod app {
             id: *sample_id as u16,
             adc: *buffer,
             pwm: pwm_req.to_array(),
+            position
         }));
 
         *sample_id = sample_id.wrapping_add(1);

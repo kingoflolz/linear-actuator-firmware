@@ -16,7 +16,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Config {
-            calibration_length: 10.0,
+            calibration_length: 15.0,
             calibration_speed: 1.0,
             calibration_voltage: 1.5,
             uvlo: 10.0,

@@ -2,11 +2,12 @@
 use bincode::{Decode, Encode};
 use foc::state_machine::ControllerUpdate;
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq, Eq)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub struct Sample {
     pub id: u16,
     pub adc: [u16; 10],
-    pub pwm: [u16; 3]
+    pub pwm: [u16; 3],
+    pub position: Option<f32>,
 }
 
 pub fn adc_buf_to_controller_update(adc_buf: &[u16; 10]) -> ControllerUpdate {

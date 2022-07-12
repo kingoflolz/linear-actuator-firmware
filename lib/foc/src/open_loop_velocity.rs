@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 
 pub struct OpenLoopVelocityController {
-    position: f32
+    pub(crate) position: f32
 }
 
 impl OpenLoopVelocityController {

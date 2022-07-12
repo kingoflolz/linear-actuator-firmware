@@ -31,11 +31,11 @@ fn main() {
                     &frame,
                     bincode_config,
                 ).unwrap().0;
-                if sample.id != last_id.wrapping_add(1) {
-                    println!("sample mismatch: {} follows {}", sample.id, last_id);
-                }
+                // if sample.id != last_id.wrapping_add(1) {
+                //     println!("sample mismatch: {} follows {}", sample.id, last_id);
+                // }
                 last_id = sample.id;
-                if sample.id % 1000 == 0 {
+                if sample.id % 500 == 0 {
                     println!("{:?}", sample);
                 }
             },
