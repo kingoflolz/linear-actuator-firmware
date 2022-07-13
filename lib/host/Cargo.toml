@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-framed = "0.4.3"
+framed = { path = "../../../framed-rs/framed" }
 serialport = "4.2.0"
 common = { path = "../common" }
 bincode = { version = "2.0.0-beta.1"}
+npy = "0.4.0"

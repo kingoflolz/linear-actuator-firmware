@@ -2,6 +2,8 @@ use serialport;
 use framed;
 use common::Sample;
 use bincode;
+#[macro_use]
+extern crate npy;
 
 fn main() {
     // let ports = serialport::available_ports().unwrap();
@@ -9,6 +11,8 @@ fn main() {
     // for port in ports {
     //     println!("{}", port.port_name);
     // }
+
+    let mut arr: Vec<Sample> = Vec::new();
 
     let bincode_config = bincode::config::standard()
         .with_little_endian()
@@ -31,13 +35,26 @@ fn main() {
                     &frame,
                     bincode_config,
                 ).unwrap().0;
-                // if sample.id != last_id.wrapping_add(1) {
-                //     println!("sample mismatch: {} follows {}", sample.id, last_id);
-                // }
+                if sample.id != last_id.wrapping_add(4) {
+                    println!("sample mismatch: {} follows {}", sample.id, last_id);
+                }
                 last_id = sample.id;
                 if sample.id % 500 == 0 {
-                    println!("{:?}", sample);
+                    println!("{:?} {}", sample, arr.len());
                 }
+                // match sample.position {
+                //     None => {}
+                //     Some(p) => {
+                //         arr.push(p.1[0]);
+                //         arr.push(p.1[1]);
+                //         arr.push(p.1[2]);
+                //         arr.push(p.1[3]);
+                //     }
+                // }
+                // if arr.len() > 100000 {
+                //     npy::to_file("save.npy", arr).unwrap();
+                //     break
+                // }
             },
             Err(framed::Error::Io(e)) => {
                 if e.kind() != std::io::ErrorKind::TimedOut {

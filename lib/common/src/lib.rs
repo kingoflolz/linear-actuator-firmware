@@ -7,7 +7,7 @@ pub struct Sample {
     pub id: u16,
     pub adc: [u16; 10],
     pub pwm: [u16; 3],
-    pub position: Option<f32>,
+    pub position: Option<(f32, [f32; 4])>,
 }
 
 pub fn adc_buf_to_controller_update(adc_buf: &[u16; 10]) -> ControllerUpdate {

@@ -29,7 +29,7 @@ version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e37cfd5e7657ada45f742d6e99ca5788580b5c529dc78faf11ece6dc702656f"
 dependencies = [
- "memchr",
+ "memchr 2.4.1",
 ]
 
 [[package]]
@@ -308,6 +308,18 @@ dependencies = [
 [[package]]
 name = "framed"
 version = "0.4.3"
+dependencies = [
+ "byteorder",
+ "crc16",
+ "postcard-cobs",
+ "ref_slice",
+ "serde",
+ "ssmarshal",
+]
+
+[[package]]
+name = "framed"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d939d56a82ce8751cd473e2e399f8d60f0a7f78cd0746fef857bd176c5b8612"
 dependencies = [
@@ -419,7 +431,8 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "common",
- "framed",
+ "framed 0.4.3",
+ "npy",
  "serialport",
 ]
 
@@ -482,7 +495,7 @@ dependencies = [
  "dwt-systick-monotonic",
  "encoder",
  "foc",
- "framed",
+ "framed 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "heapless",
  "libm",
  "micromath",
@@ -516,6 +529,15 @@ name = "mach"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "memchr"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "148fab2e51b4f1cfc66da2a7c32981d1d3c083a803978268bb11fe4b86925e7a"
 dependencies = [
  "libc",
 ]
@@ -559,6 +581,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05aec50c70fd288702bcd93284a8444607f3292dbdf2a30de5ea5dcdbe72287b"
+dependencies = [
+ "memchr 1.0.2",
+]
+
+[[package]]
+name = "npy"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "428bbb4dd63ca4318d430b61e64e9ba7809d11525605905eaa88c73b01d91ed4"
+dependencies = [
+ "byteorder",
+ "nom",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -598,6 +639,12 @@ name = "pkg-config"
 version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
+
+[[package]]
+name = "postcard-cobs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78eac0ec394e2eb837b258d587ec78cf19974fbe5ada0068e2ee732533b52fbd"
 
 [[package]]
 name = "ppv-lite86"
@@ -700,7 +747,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c4eb3267174b8c6c2f654116623910a0fef09c4753f8dd83db29c48a0df988b"
 dependencies = [
  "aho-corasick",
- "memchr",
+ "memchr 2.4.1",
  "regex-syntax",
 ]
 

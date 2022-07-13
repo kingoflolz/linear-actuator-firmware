@@ -47,7 +47,7 @@ pub struct Encoder {
 }
 
 impl Encoder {
-    pub fn calculate(&mut self, encoder_values: [f32; 4]) -> f32 {
+    pub fn calculate(&mut self, encoder_values: [f32; 4]) -> (f32, [f32; 4]) {
         let [a, b, c, d] = encoder_values;
 
         let a = self.normalizers[0].normalize(a);
@@ -55,14 +55,14 @@ impl Encoder {
         let c = self.normalizers[2].normalize(c);
         let d = self.normalizers[3].normalize(d);
 
-        let angle1 = libm::atan2f(a, b);
-        let angle2 = libm::atan2f(c, d);
+        let angle1 = libm::atan2f(d, a);
+        let angle2 = libm::atan2f(c, b);
         let angle3 = libm::atan2f(a, c);
         let angle4 = libm::atan2f(b, d);
 
-        [angle1, angle2, angle3, angle4].iter().zip(&mut self.unwraps).map(|(angle, unwrap)| {
+        ([angle1, angle2, angle4].iter().zip(&mut self.unwraps).map(|(angle, unwrap)| {
             unwrap.unwrap(*angle)
-        }).sum::<f32>() / 4.0
+        }).sum::<f32>() / 3.0, [angle1, angle2, angle3, angle4])
     }
 }
 
@@ -76,7 +76,7 @@ impl EncoderState {
         EncoderState::Calibrating(EncoderCalibrator::new())
     }
 
-    pub fn update(&mut self, encoder_values: [f32; 4]) -> Option<f32> {
+    pub fn update(&mut self, encoder_values: [f32; 4]) -> Option<(f32, [f32; 4])> {
         match self {
             EncoderState::Calibrating(calibrator) => {
                 calibrator.update(encoder_values);

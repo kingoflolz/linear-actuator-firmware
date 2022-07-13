@@ -328,9 +328,13 @@ mod app {
         usb_dev: &mut UsbDevice<'static, UsbBusType>,
         queue: Option<&mut Consumer<'static, Sample, 64>>,
     ) {
+        usb_dev.poll(&mut [serial]);
         if let Some(c) = queue {
-            loop {
-                match c.dequeue() {
+            for _ in 0..16 {
+                match c.peek() {
+                    None => {
+                        break;
+                    }
                     Some(s) => {
                         let mut buf = [0; 64];
                         let length = bincode::encode_into_slice(
@@ -341,42 +345,35 @@ mod app {
                                 .with_fixed_int_encoding()
                                 .skip_fixed_array_length(),
                         )
-                        .unwrap();
+                            .unwrap();
 
                         let mut codec = framed::bytes::Config::default().to_codec();
                         let mut encoded_buf = [0; 64];
                         let encoded_len = codec.encode_to_slice(&buf[0..length], &mut encoded_buf).unwrap();
 
-                        loop {
+                        for i in 0..16 {
                             match serial.write_packet(&encoded_buf[0..encoded_len]) {
                                 Err(UsbError::WouldBlock) => {
+                                    rprintln!("w");
                                     usb_dev.poll(&mut [serial]);
                                 },
                                 Ok(_) => {
-                                    rprintln!("p");
+                                    rprintln!("p {}", c.len());
+                                    c.dequeue();
                                     break;
                                 }
-                                _ => { break }
+                                Err(e) => {
+                                    rprintln!("err {:?}", e);
+                                }
                             }
+                            usb_dev.poll(&mut [serial]);
                         }
-                        let _ = serial.write_packet(&[]);
-                    }
-                    None => {
-                        break;
                     }
                 }
                 usb_dev.poll(&mut [serial]);
             }
         }
     }
-
-    // #[task(binds = OTG_FS, shared = [serial, usb_dev], priority = 2)]
-    // fn usb_interrupt_polling(mut cx: usb_interrupt_polling::Context) {
-    //     // (cx.shared.serial, cx.shared.usb_dev).lock(|serial: &mut SerialPort<_>,
-    //     //                                             usb_dev: &mut UsbDevice<_>| {
-    //     //     usb_dev.poll(&mut [serial]);
-    //     // });
-    // }
 
     #[task(shared = [serial, usb_dev], local = [c])]
     fn usb_idle_polling(cx: usb_idle_polling::Context) {
@@ -387,7 +384,7 @@ mod app {
                 poll_usb(serial, usb_dev, Some(local.c))
             },
         );
-        usb_idle_polling::spawn_after(500.micros()).ok();
+        usb_idle_polling::spawn_after(1000.micros()).ok();
     }
 
     #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, controller, config, pwm, encoder], priority = 5)]
@@ -418,12 +415,14 @@ mod app {
 
         pwm.set_duty(&pwm_req);
 
-        drop(p.enqueue(Sample {
-            id: *sample_id as u16,
-            adc: *buffer,
-            pwm: pwm_req.to_array(),
-            position
-        }));
+        if *sample_id % 4 == 0 {
+            p.enqueue(Sample {
+                id: *sample_id as u16,
+                adc: *buffer,
+                pwm: pwm_req.to_array(),
+                position
+            });
+        }
 
         *sample_id = sample_id.wrapping_add(1);
         *adc_buffer = Some(buffer);
