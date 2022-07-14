@@ -18,7 +18,7 @@ impl FieldOrientedControl {
 
     pub fn update(&mut self, update: &ControllerUpdate, config: &Config) -> VoltageControllerOutput {
         let pos = update.position.unwrap();
-        let angle = self.cal.to_angle(pos, config) + core::f32::consts::PI / 2.0;
+        let angle = self.cal.to_angle(pos, config) + core::f32::consts::FRAC_PI_2;
 
         self.open_loop.process_position(angle, update, config)
     }

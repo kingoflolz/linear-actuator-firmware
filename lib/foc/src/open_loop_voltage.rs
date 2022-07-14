@@ -1,4 +1,4 @@
-use libm::{cosf, sinf};
+use libm::sincosf;
 use crate::config::Config;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 
@@ -30,8 +30,10 @@ impl OpenLoopVoltageController {
         let voltage = update.bus_voltage;
         let request_duty = config.open_loop_voltage / voltage;
 
-        let alpha = sinf(position_req) * request_duty;
-        let beta = cosf(position_req) * request_duty;
+        let (s, c) = sincosf(position_req);
+
+        let alpha = s * request_duty;
+        let beta = c * request_duty;
 
         self.position = position_req;
 

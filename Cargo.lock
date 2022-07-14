@@ -311,18 +311,6 @@ dependencies = [
 [[package]]
 name = "framed"
 version = "0.4.3"
-dependencies = [
- "byteorder",
- "crc16",
- "postcard-cobs",
- "ref_slice",
- "serde",
- "ssmarshal",
-]
-
-[[package]]
-name = "framed"
-version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d939d56a82ce8751cd473e2e399f8d60f0a7f78cd0746fef857bd176c5b8612"
 dependencies = [
@@ -434,7 +422,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "common",
- "framed 0.4.3",
  "npy",
  "serialport",
 ]
@@ -498,7 +485,7 @@ dependencies = [
  "dwt-systick-monotonic",
  "encoder",
  "foc",
- "framed 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "framed",
  "heapless",
  "libm",
  "micromath",
@@ -642,12 +629,6 @@ name = "pkg-config"
 version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
-
-[[package]]
-name = "postcard-cobs"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78eac0ec394e2eb837b258d587ec78cf19974fbe5ada0068e2ee732533b52fbd"
 
 [[package]]
 name = "ppv-lite86"
