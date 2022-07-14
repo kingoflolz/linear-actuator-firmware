@@ -40,7 +40,6 @@ mod app {
     use framed;
 
     use common::*;
-    use foc::calibration::EncoderCalibrationState;
 
     pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
@@ -351,7 +350,7 @@ mod app {
                         let mut encoded_buf = [0; 64];
                         let encoded_len = codec.encode_to_slice(&buf[0..length], &mut encoded_buf).unwrap();
 
-                        for i in 0..16 {
+                        for _ in 0..16 {
                             match serial.write_packet(&encoded_buf[0..encoded_len]) {
                                 Err(UsbError::WouldBlock) => {
                                     rprintln!("w");
@@ -416,14 +415,14 @@ mod app {
         pwm.set_duty(&pwm_req);
 
         if *sample_id % 4 == 0 {
-            p.enqueue(Sample {
+            drop(p.enqueue(Sample {
                 id: *sample_id as u16,
                 adc: *buffer,
                 pwm: pwm_req.to_array(),
                 position: update.position,
                 position_target: 0.0,
                 calibration: None
-            });
+            }));
         }
 
         *sample_id = sample_id.wrapping_add(1);

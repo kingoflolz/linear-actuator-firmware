@@ -1,4 +1,4 @@
-use rtt_target::rprintln;
+// use rtt_target::rprintln;
 use crate::config::Config;
 use crate::open_loop_voltage::OpenLoopVoltageController;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
@@ -119,7 +119,7 @@ impl EncoderCalibrationController {
                 let position_target = self.open_loop.get_position(&config);
 
                 let error = position - position_target;
-                let mut norm_builder;
+                let norm_builder;
                 match state {
                      EncoderCalibrationState::Calib1 => {
                          if self.open_loop.position < self.position_target {

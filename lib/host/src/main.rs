@@ -2,7 +2,6 @@ use serialport;
 use framed;
 use common::Sample;
 use bincode;
-#[macro_use]
 extern crate npy;
 
 fn main() {

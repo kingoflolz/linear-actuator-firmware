@@ -59,7 +59,7 @@ impl AlphaBetaVoltages {
 }
 
 impl DQVoltages {
-    fn inv_park_transform(&self, angle: f32) -> AlphaBetaVoltages {
+    pub fn inv_park_transform(&self, angle: f32) -> AlphaBetaVoltages {
         let (s, c) = sincosf(angle);
 
         AlphaBetaVoltages {

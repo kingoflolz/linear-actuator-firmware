@@ -2,6 +2,7 @@
 use bincode::{Decode, Encode};
 use foc::state_machine::ControllerUpdate;
 use foc::config::Config;
+use foc::transforms::PhaseCurrents;
 use encoder::EncoderOutput;
 use encoder::normalizer::Normalizer;
 
@@ -31,9 +32,11 @@ pub fn to_controller_update(adc_buf: &[u16; 10], position: &Option<EncoderOutput
     }
 
     ControllerUpdate {
-        u_current: adc_to_current(adc_buf[5]),
-        v_current: adc_to_current(adc_buf[6]),
-        w_current: adc_to_current(adc_buf[7]),
+        phase_currents: PhaseCurrents{
+            u: adc_to_current(adc_buf[5]),
+            v: adc_to_current(adc_buf[6]),
+            w: adc_to_current(adc_buf[7]),
+        },
         bus_voltage: vbus,
         position: position.clone().map(|position|
             position.position / core::f32::consts::TAU * config.encoder_len_per_cycle

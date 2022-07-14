@@ -1,8 +1,8 @@
 use crate::config::Config;
-use crate::open_loop_voltage::OpenLoopVoltageController;
 use crate::svm::IterativeSVM;
 use crate::calibration::EncoderCalibrationController;
 use crate::foc::FieldOrientedControl;
+use crate::transforms::PhaseCurrents;
 
 pub struct VoltageControllerOutput {
     pub driver_enable: bool,
@@ -100,11 +100,7 @@ impl PWMCommand {
 }
 
 pub struct ControllerUpdate {
-    pub u_current: f32,
-    pub v_current: f32,
-    pub w_current: f32,
-
+    pub phase_currents: PhaseCurrents,
     pub bus_voltage: f32,
-
     pub position: Option<f32>,
 }
