@@ -14,7 +14,10 @@ pub struct Config {
     pub switching_clock_frequency: f32,
     /// how much to switch all 3 phases to all-on for bootstrap cap recharge
     pub cycle_deadtime: f32, // in seconds
-    pub control_frequency: f32
+    pub control_frequency: f32,
+
+    pub current_controller_k_p: f32,
+    pub current_controller_k_i: f32,
 }
 
 impl Config {
@@ -30,6 +33,9 @@ impl Config {
             switching_clock_frequency: 100e6,
             cycle_deadtime: 50e-9, // ~50ns is min controllable on time
             control_frequency: 8e3,
+
+            current_controller_k_p: 0.0,
+            current_controller_k_i: 0.0
         }
     }
 }

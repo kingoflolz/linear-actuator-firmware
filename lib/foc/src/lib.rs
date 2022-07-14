@@ -11,3 +11,4 @@ pub mod config;
 pub mod open_loop_voltage;
 pub mod foc;
 pub mod transforms;
+pub mod pid;

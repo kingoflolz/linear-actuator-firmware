@@ -20,7 +20,7 @@ impl VoltageController {
         match self {
             VoltageController::Cal(cal) => {
                 if cal.is_done() {
-                    self.enter_foc()
+                    self.enter_foc(config)
                 }
             },
             _ => {}
@@ -36,10 +36,10 @@ impl VoltageController {
         }
     }
 
-    pub fn enter_foc(&mut self) {
+    pub fn enter_foc(&mut self, config: &Config) {
         match self {
             VoltageController::Cal(cal) => {
-                let foc = FieldOrientedControl::new(cal.get_calib().unwrap());
+                let foc = FieldOrientedControl::new(cal.get_calib().unwrap(), config);
                 *self = VoltageController::Foc(foc);
             }
             _ => {}
