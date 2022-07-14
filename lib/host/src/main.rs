@@ -40,7 +40,7 @@ fn main() {
                 }
                 last_id = sample.id;
                 if sample.id % 500 == 0 {
-                    println!("{:?} {}", sample, arr.len());
+                    println!("pos: {:?}mm, pos tgt: {}, calib {:?}", sample.position, sample.position_target, sample.calibration);
                 }
                 // match sample.position {
                 //     None => {}

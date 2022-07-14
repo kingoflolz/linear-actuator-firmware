@@ -1,8 +1,12 @@
 pub struct Config {
+    // setup constants
+    pub motor_len_per_cycle: f32, // mm per electrical cycle
+    pub encoder_len_per_cycle: f32, // mm per cycle
+
     // encoder calibration
-    pub calibration_length: f32, // in electrical revolutions
+    pub calibration_length: f32, // in mm
     pub calibration_speed: f32, // in electrical revolutions per second
-    pub calibration_voltage: f32, // in volts
+    pub open_loop_voltage: f32, // in volts
 
     pub uvlo: f32, // in volts
 
@@ -16,9 +20,11 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Config {
-            calibration_length: 15.0,
+            motor_len_per_cycle: 19.0,
+            encoder_len_per_cycle: 2.34375,
+            calibration_length: 100.0,
             calibration_speed: 1.0,
-            calibration_voltage: 1.5,
+            open_loop_voltage: 2.0,
             uvlo: 10.0,
             switching_frequency: 200e3,
             switching_clock_frequency: 100e6,

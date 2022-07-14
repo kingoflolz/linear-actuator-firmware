@@ -143,6 +143,7 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "encoder",
  "foc",
 ]
 
@@ -292,6 +293,7 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 name = "encoder"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "libm",
  "rand",
  "rand_distr",
@@ -301,6 +303,7 @@ dependencies = [
 name = "foc"
 version = "0.1.0"
 dependencies = [
+ "encoder",
  "libm",
  "rtt-target",
 ]

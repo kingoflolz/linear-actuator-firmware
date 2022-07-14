@@ -1,3 +1,5 @@
+use bincode::{Decode, Encode};
+
 #[derive(Debug, Clone, Copy)]
 pub struct NormalizerBuilder {
     n: u32,
@@ -25,21 +27,23 @@ impl NormalizerBuilder {
         self.ex2 += (x - self.k) * (x - self.k);
     }
 
-    pub fn get_normalizer(&self) -> Normalizer {
-        assert!(self.n > 2);
+    pub fn get_normalizer(&self) -> Option<Normalizer> {
+        if self.n > 2 {
+            let var = (self.ex2 - self.ex * self.ex / self.n as f32) / (self.n as f32 - 1.0);
+            let std = libm::sqrtf(var);
+            let mean = self.k + self.ex / self.n as f32;
 
-        let var = (self.ex2 - self.ex * self.ex / self.n as f32) / (self.n as f32 - 1.0);
-        let std = libm::sqrtf(var);
-        let mean = self.k + self.ex / self.n as f32;
-
-        Normalizer {
-            mean,
-            std,
+            Some(Normalizer {
+                mean,
+                std,
+            })
+        } else {
+            None
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Encode, Decode, Debug, Clone, Copy, PartialEq)]
 pub struct Normalizer{
     pub mean: f32,
     pub std: f32,

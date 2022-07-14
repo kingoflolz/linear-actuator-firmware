@@ -155,9 +155,9 @@ mod app {
 
         // leds
         gpiob.pb6.into_push_pull_output().set_high();
-        gpiob.pb7.into_push_pull_output().set_high();
+        // gpiob.pb7.into_push_pull_output().set_high();
         gpiob.pb8.into_push_pull_output().set_high();
-        gpiob.pb9.into_push_pull_output().set_high();
+        // gpiob.pb9.into_push_pull_output().set_high();
 
         let (mut ch_u, mut ch_v, mut ch_w) = device
             .TIM1
@@ -406,10 +406,10 @@ mod app {
 
         let position = encoder.update([buffer[1] as f32, buffer[2] as f32, buffer[3] as f32, buffer[4] as f32]);
 
-        let update = adc_buf_to_controller_update(&buffer);
+        let update = to_controller_update(&buffer, &position, &config);
         let pwm_req = controller.update(&update, &config);
 
-        if controller.cal.state == EncoderCalibrationState::Done {
+        if controller.encoder_ready() {
             encoder.calibration_done();
         }
 
@@ -420,7 +420,9 @@ mod app {
                 id: *sample_id as u16,
                 adc: *buffer,
                 pwm: pwm_req.to_array(),
-                position
+                position: update.position,
+                position_target: 0.0,
+                calibration: None
             });
         }
 

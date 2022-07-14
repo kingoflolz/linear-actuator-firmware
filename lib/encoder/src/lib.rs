@@ -4,6 +4,8 @@
 #[macro_use]
 extern crate std;
 
+use bincode::{Decode, Encode};
+
 pub mod normalizer;
 pub mod unwrap;
 
@@ -27,7 +29,7 @@ impl EncoderCalibrator {
     fn get_normalizers(&self) -> [normalizer::Normalizer; 4] {
         let mut normalizers = [normalizer::Normalizer::new(); 4];
         for i in 0..4 {
-            normalizers[i] = self.normalizers[i].get_normalizer();
+            normalizers[i] = self.normalizers[i].get_normalizer().unwrap();
         }
         normalizers
     }
@@ -35,7 +37,7 @@ impl EncoderCalibrator {
     pub fn get_encoder(&self) -> Encoder {
         Encoder {
             normalizers: self.get_normalizers(),
-            unwraps: [unwrap::Unwrapper::new(); 4],
+            unwraps: [unwrap::Unwrapper::new(); 1],
         }
     }
 }
@@ -43,11 +45,16 @@ impl EncoderCalibrator {
 #[derive(Debug, Clone, Copy)]
 pub struct Encoder {
     normalizers: [normalizer::Normalizer; 4],
-    unwraps: [unwrap::Unwrapper; 4],
+    unwraps: [unwrap::Unwrapper; 1],
+}
+
+#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+pub struct EncoderOutput {
+    pub position: f32
 }
 
 impl Encoder {
-    pub fn calculate(&mut self, encoder_values: [f32; 4]) -> (f32, [f32; 4]) {
+    pub fn calculate(&mut self, encoder_values: [f32; 4]) -> EncoderOutput {
         let [a, b, c, d] = encoder_values;
 
         let a = self.normalizers[0].normalize(a);
@@ -55,14 +62,16 @@ impl Encoder {
         let c = self.normalizers[2].normalize(c);
         let d = self.normalizers[3].normalize(d);
 
-        let angle1 = libm::atan2f(d, a);
-        let angle2 = libm::atan2f(c, b);
-        let angle3 = libm::atan2f(a, c);
-        let angle4 = libm::atan2f(b, d);
+        let x = a - b;
+        let y = c - d;
 
-        ([angle1, angle2, angle4].iter().zip(&mut self.unwraps).map(|(angle, unwrap)| {
-            unwrap.unwrap(*angle)
-        }).sum::<f32>() / 3.0, [angle1, angle2, angle3, angle4])
+        let angle1 = libm::atan2f(x, y);
+
+        let unwrap1 = self.unwraps[0].unwrap(angle1);
+
+        EncoderOutput{
+            position: unwrap1,
+        }
     }
 }
 
@@ -76,7 +85,7 @@ impl EncoderState {
         EncoderState::Calibrating(EncoderCalibrator::new())
     }
 
-    pub fn update(&mut self, encoder_values: [f32; 4]) -> Option<(f32, [f32; 4])> {
+    pub fn update(&mut self, encoder_values: [f32; 4]) -> Option<EncoderOutput> {
         match self {
             EncoderState::Calibrating(calibrator) => {
                 calibrator.update(encoder_values);

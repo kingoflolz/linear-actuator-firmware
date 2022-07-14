@@ -1,16 +1,21 @@
 #![no_std]
 use bincode::{Decode, Encode};
 use foc::state_machine::ControllerUpdate;
+use foc::config::Config;
+use encoder::EncoderOutput;
+use encoder::normalizer::Normalizer;
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub struct Sample {
     pub id: u16,
     pub adc: [u16; 10],
     pub pwm: [u16; 3],
-    pub position: Option<(f32, [f32; 4])>,
+    pub position: Option<f32>,
+    pub position_target: f32,
+    pub calibration: Option<[Normalizer; 2]>
 }
 
-pub fn adc_buf_to_controller_update(adc_buf: &[u16; 10]) -> ControllerUpdate {
+pub fn to_controller_update(adc_buf: &[u16; 10], position: &Option<EncoderOutput>, config: &Config) -> ControllerUpdate {
     fn adc_to_voltage(adc: u16) -> f32 {
         adc as f32 / 4096.0 * 3.3
     }
@@ -30,6 +35,8 @@ pub fn adc_buf_to_controller_update(adc_buf: &[u16; 10]) -> ControllerUpdate {
         v_current: adc_to_current(adc_buf[6]),
         w_current: adc_to_current(adc_buf[7]),
         bus_voltage: vbus,
-        position: None
+        position: position.clone().map(|position|
+            position.position / core::f32::consts::TAU * config.encoder_len_per_cycle
+        ),
     }
 }

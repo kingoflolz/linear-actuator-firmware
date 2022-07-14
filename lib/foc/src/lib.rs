@@ -8,4 +8,5 @@ pub mod svm;
 pub mod state_machine;
 pub mod calibration;
 pub mod config;
-pub mod open_loop_velocity;
+pub mod open_loop_voltage;
+pub mod foc;

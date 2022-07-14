@@ -50,7 +50,7 @@ mod tests {
             let x = normal.sample(&mut rng);
             gt_unwrapped += x;
 
-            let unwrapped = unwrapper.unwrap(gt_unwrapped % (2.0 * core::f32::consts::PI));
+            let unwrapped = unwrapper.unwrap(gt_unwrapped % core::f32::consts::TAU);
             assert!((unwrapped - gt_unwrapped).abs() < 0.01, "{}, unwrapped: {}, gt_unwrapped: {}", i, unwrapped, gt_unwrapped);
         }
     }
