@@ -39,11 +39,14 @@ impl FieldOrientedControl {
         //      q: config.open_loop_voltage
         // };
 
+        let q = (- 50.0 - pos) / 2.0;
+        let q = q.max(-8.0).min(8.0);
+
         let voltage_request = self.current_controller.update(
             &dq_currents,
             &DQCurrents{
                 d: 0.0,
-                q: 8.0,
+                q,
             });
 
         voltage_request
