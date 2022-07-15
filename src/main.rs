@@ -406,7 +406,11 @@ mod app {
         let position = encoder.update([buffer[1] as f32, buffer[2] as f32, buffer[3] as f32, buffer[4] as f32]);
 
         let update = to_controller_update(&buffer, &position, &config);
-        let pwm_req = controller.update(&update, &config);
+        let mut pwm_req = controller.update(&update, &config);
+
+        if update.phase_currents.max_magnitude() > 10.0 {
+            pwm_req.driver_enable = false;
+        }
 
         if controller.encoder_ready() {
             encoder.calibration_done();
@@ -419,9 +423,7 @@ mod app {
                 id: *sample_id as u16,
                 adc: *buffer,
                 pwm: pwm_req.to_array(),
-                position: update.position,
-                position_target: 0.0,
-                calibration: None
+                dq_currents: controller.get_dq(&update, config),
             }));
         }
 

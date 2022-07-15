@@ -17,6 +17,15 @@ impl FieldOrientedControl {
         }
     }
 
+    pub fn get_dq(&self, update: &ControllerUpdate, config: &Config) -> DQCurrents {
+        let pos = update.position.unwrap();
+        let angle = self.cal.to_angle(pos, config);
+
+        update.phase_currents
+            .clarke_transform()
+            .park_transform(angle)
+    }
+
     pub fn update(&mut self, update: &ControllerUpdate, config: &Config) -> VoltageControllerOutput {
         let pos = update.position.unwrap();
         let angle = self.cal.to_angle(pos, config);
@@ -25,22 +34,20 @@ impl FieldOrientedControl {
             .clarke_transform()
             .park_transform(angle);
 
-        // PI controllers goes here, voltage as output and current error as input
-
-        let _voltage_request = DQVoltages {
-             d: 0.0,
-             q: config.open_loop_voltage
-        };
+        // let voltage_request = DQVoltages {
+        //      d: 0.0,
+        //      q: config.open_loop_voltage
+        // };
 
         let voltage_request = self.current_controller.update(
             &dq_currents,
             &DQCurrents{
                 d: 0.0,
-                q: 1.0
+                q: 8.0,
             });
 
         voltage_request
             .inv_park_transform(angle)
-            .to_voltage_controller_output()
+            .to_voltage_controller_output(update)
     }
 }

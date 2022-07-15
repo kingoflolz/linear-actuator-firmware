@@ -1,11 +1,13 @@
 use libm::sincosf;
-use crate::state_machine::VoltageControllerOutput;
+use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
+use bincode::{Decode, Encode};
 
 pub struct AlphaBetaCurrents {
     pub alpha: f32, // units of amps
     pub beta: f32,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct PhaseCurrents {
     pub u: f32, // units of amps
     pub v: f32,
@@ -20,8 +22,33 @@ impl PhaseCurrents {
             beta: one_by_sqrt3 * (self.v - self.w),
         }
     }
+
+    pub fn normalize(&mut self) -> PhaseCurrents {
+        PhaseCurrents {
+            u: self.u,
+            v: self.v,
+            w: -(self.u + self.v),
+        }
+    }
+
+    pub fn sum_currents(&self) -> f32 {
+        self.u + self.v + self.w
+    }
+
+    fn max(&self) -> f32 {
+        self.u.max(self.v).max(self.w)
+    }
+
+    fn min(&self) -> f32 {
+        self.u.min(self.v).min(self.w)
+    }
+
+    pub fn max_magnitude(&self) -> f32 {
+        self.max().max(-self.min())
+    }
 }
 
+#[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub struct DQCurrents {
     pub d: f32, // units of amps
     pub q: f32,
@@ -32,8 +59,8 @@ impl AlphaBetaCurrents {
         let (s, c) = sincosf(angle);
 
         DQCurrents {
-            d: self.alpha * c + self.beta * s,
-            q: self.beta * c - self.alpha * s,
+            q: self.alpha * c - self.beta * s,
+            d: self.beta * c + self.alpha * s,
         }
     }
 }
@@ -49,11 +76,11 @@ pub struct AlphaBetaVoltages {
 }
 
 impl AlphaBetaVoltages {
-    pub fn to_voltage_controller_output(&self) -> VoltageControllerOutput {
+    pub fn to_voltage_controller_output(&self, update: &ControllerUpdate) -> VoltageControllerOutput {
         VoltageControllerOutput {
             driver_enable: true,
-            alpha: self.alpha,
-            beta: self.beta,
+            alpha: self.alpha / 15.0,
+            beta: self.beta / 15.0,
         }
     }
 }
@@ -63,8 +90,8 @@ impl DQVoltages {
         let (s, c) = sincosf(angle);
 
         AlphaBetaVoltages {
-            alpha: self.d * c - self.q * s,
-            beta: self.q * c + self.d * s,
+            alpha: self.q * c + self.d * s,
+            beta: self.d * c - self.q * s,
         }
     }
 }

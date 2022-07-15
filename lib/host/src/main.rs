@@ -1,6 +1,7 @@
 use serialport;
 use framed;
-use common::Sample;
+use common::{Sample, to_controller_update};
+use foc::config::Config;
 use bincode;
 extern crate npy;
 
@@ -26,6 +27,8 @@ fn main() {
 
     let mut last_id: u16 = 0;
 
+    let config = Config::new();
+
     loop {
         let frame = receiver.recv();
         match frame {
@@ -34,12 +37,16 @@ fn main() {
                     &frame,
                     bincode_config,
                 ).unwrap().0;
-                if sample.id != last_id.wrapping_add(4) {
-                    println!("sample mismatch: {} follows {}", sample.id, last_id);
-                }
+                // if sample.id != last_id.wrapping_add(4) {
+                //     println!("sample mismatch: {} follows {}", sample.id, last_id);
+                // }
                 last_id = sample.id;
+
+                let update =  to_controller_update(&sample.adc, &None, &config);
+
                 if sample.id % 500 == 0 {
-                    println!("pos: {:?}mm, pos tgt: {}, calib {:?}", sample.position, sample.position_target, sample.calibration);
+                    // println!("pos: {:?}mm, pos tgt: {}, calib {:?}", sample.position, sample.position_target, sample.calibration);
+                    println!("{:?} {:?} {:?}", update.phase_currents, sample.dq_currents, sample.pwm);
                 }
                 // match sample.position {
                 //     None => {}

@@ -2,11 +2,11 @@ use crate::config::Config;
 use crate::svm::IterativeSVM;
 use crate::calibration::EncoderCalibrationController;
 use crate::foc::FieldOrientedControl;
-use crate::transforms::PhaseCurrents;
+use crate::transforms::{DQCurrents, PhaseCurrents};
 
 pub struct VoltageControllerOutput {
     pub driver_enable: bool,
-    pub alpha: f32,
+    pub alpha: f32, // units of duty cycle
     pub beta: f32,
 }
 
@@ -84,8 +84,20 @@ impl Controller {
             }
         }
     }
+
+    pub fn get_dq(&self, update: &ControllerUpdate, config: &Config) -> Option<DQCurrents> {
+        match &self.voltage_controller {
+            VoltageController::Cal(_) => {
+                None
+            }
+            VoltageController::Foc(foc) => {
+                Some(foc.get_dq(update, config))
+            }
+        }
+    }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct PWMCommand {
     pub driver_enable: bool,
     pub u_duty: u16,
@@ -99,6 +111,7 @@ impl PWMCommand {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ControllerUpdate {
     pub phase_currents: PhaseCurrents,
     pub bus_voltage: f32,

@@ -56,8 +56,8 @@ impl DQCurrentController {
 
     pub fn update(&mut self, current_inputs: &DQCurrents, current_requests: &DQCurrents) -> DQVoltages {
         DQVoltages {
-            d: self.d_controller.update(current_inputs.d - current_requests.d),
-            q: self.q_controller.update(current_inputs.q - current_requests.q),
+            d: -self.d_controller.update(current_inputs.d - current_requests.d),
+            q: -self.q_controller.update(current_inputs.q - current_requests.q),
         }
     }
 }
