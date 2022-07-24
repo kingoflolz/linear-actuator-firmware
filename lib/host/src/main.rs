@@ -12,7 +12,7 @@ fn main() {
     //     println!("{}", port.port_name);
     // }
 
-    let mut arr: Vec<Sample> = Vec::new();
+    let mut arr: Vec<f32> = Vec::new();
 
     let bincode_config = bincode::config::standard()
         .with_little_endian()
@@ -21,7 +21,7 @@ fn main() {
 
     let mut codec = framed::bytes::Config::default();
 
-    let port = serialport::new("/dev/ttyACM0", 9600).open().unwrap();
+    let port = serialport::new("/dev/ttyACM21", 9600).open().unwrap();
 
     let mut receiver = codec.to_receiver(port);
 
@@ -46,21 +46,15 @@ fn main() {
 
                 if sample.id % 500 == 0 {
                     // println!("pos: {:?}mm, pos tgt: {}, calib {:?}", sample.position, sample.position_target, sample.calibration);
-                    println!("{:?} {:?} {:?}", update.phase_currents, sample.dq_currents, sample.pwm);
+                    println!("{:?} {:?}", sample.pwm, update.phase_currents);
                 }
-                // match sample.position {
-                //     None => {}
-                //     Some(p) => {
-                //         arr.push(p.1[0]);
-                //         arr.push(p.1[1]);
-                //         arr.push(p.1[2]);
-                //         arr.push(p.1[3]);
-                //     }
-                // }
-                // if arr.len() > 100000 {
-                //     npy::to_file("save.npy", arr).unwrap();
-                //     break
-                // }
+                for i in sample.adc.iter() {
+                    arr.push(*i as f32);
+                }
+                if arr.len() > 1000000 {
+                    npy::to_file("save.npy", arr).unwrap();
+                    break
+                }
             },
             Err(framed::Error::Io(e)) => {
                 if e.kind() != std::io::ErrorKind::TimedOut {

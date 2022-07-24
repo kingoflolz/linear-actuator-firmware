@@ -27,7 +27,7 @@ impl PhaseCurrents {
         PhaseCurrents {
             u: self.u,
             v: self.v,
-            w: -(self.u + self.v),
+            w: self.w,
         }
     }
 

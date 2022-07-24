@@ -28,7 +28,7 @@ impl OpenLoopVoltageController {
 
     pub fn process_position(&mut self, position_req: f32, update: &ControllerUpdate, config: &Config) -> VoltageControllerOutput {
         let voltage = update.bus_voltage;
-        let request_duty = config.open_loop_voltage / 15.0;
+        let request_duty = config.open_loop_voltage / voltage;
 
         let (s, c) = sincosf(position_req);
 

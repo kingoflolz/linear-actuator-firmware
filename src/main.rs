@@ -45,7 +45,7 @@ mod app {
         u: PwmChannel<TIM1, 0_u8>,
         v: PwmChannel<TIM1, 1_u8>,
         w: PwmChannel<TIM1, 2_u8>,
-        pwm_en: Pin<'B', 15_u8, Output>,
+        pwm_en: Pin<'C', 6_u8, Output>,
     }
 
     impl MotorOutputBlock {
@@ -71,7 +71,7 @@ mod app {
     type MyMono = DwtSystick<MONO_HZ>;
 
     type DMATransfer =
-        Transfer<Stream0<DMA2>, 0, Adc<ADC1>, PeripheralToMemory, &'static mut [u16; 10]>;
+        Transfer<Stream0<DMA2>, 0, Adc<ADC1>, PeripheralToMemory, &'static mut [u16; 16]>;
 
     #[shared]
     struct Shared {
@@ -89,15 +89,15 @@ mod app {
         // timer_c: Consumer<'static, PWMCommand, 32>,
 
         adc_transfer: DMATransfer,
-        adc_buffer: Option<&'static mut [u16; 10]>,
+        adc_buffer: Option<&'static mut [u16; 16]>,
         controller: Controller,
         encoder: EncoderState,
         config: Config,
         pwm: MotorOutputBlock,
     }
 
-    #[init(local = [adc_buffer_: [u16; 10] = [0; 10],
-    adc_buffer2: [u16; 10] = [0; 10],
+    #[init(local = [adc_buffer_: [u16; 16] = [0; 16],
+    adc_buffer2: [u16; 16] = [0; 16],
     ep_memory: [u32; 1024] = [0; 1024],
     usb_bus: Option < UsbBusAllocator < UsbBus < USB >> > = None,
     q: Queue < Sample, 64 > = Queue::new(),
@@ -137,6 +137,7 @@ mod app {
 
         let gpioa = device.GPIOA.split();
         let gpiob = device.GPIOB.split();
+        let gpioc = device.GPIOC.split();
 
         let usb = USB {
             usb_global: device.OTG_FS_GLOBAL,
@@ -147,16 +148,11 @@ mod app {
             hclk: clocks.hclk(),
         };
 
-        gpiob.pb2.into_floating_input();
-        gpiob.pb3.into_floating_input();
-        gpiob.pb4.into_floating_input();
-        gpiob.pb5.into_floating_input();
-
         // leds
-        gpiob.pb6.into_push_pull_output().set_high();
-        // gpiob.pb7.into_push_pull_output().set_high();
-        gpiob.pb8.into_push_pull_output().set_high();
-        // gpiob.pb9.into_push_pull_output().set_high();
+        gpiob.pb12.into_push_pull_output().set_high();
+        gpiob.pb13.into_push_pull_output().set_high();
+        gpiob.pb14.into_push_pull_output().set_high();
+        gpiob.pb15.into_push_pull_output().set_high();
 
         let (mut ch_u, mut ch_v, mut ch_w) = device
             .TIM1
@@ -171,7 +167,7 @@ mod app {
             )
             .split();
 
-        ch_u.set_duty(0);
+        ch_u.set_duty(10);
         ch_v.set_duty(0);
         ch_w.set_duty(0);
 
@@ -233,59 +229,92 @@ mod app {
         let mut adc = Adc::adc1(device.ADC1, true, adc_config);
         // vbias
         adc.configure_channel(
-            &gpiob.pb0.into_analog(),
+            &gpioa.pa5.into_analog(),
             Sequence::from(0),
-            SampleTime::Cycles_15,
+            SampleTime::Cycles_3,
         );
         // encoder
         adc.configure_channel(
-            &gpioa.pa1.into_analog(),
+            &gpioa.pa6.into_analog(),
             Sequence::from(1),
-            SampleTime::Cycles_15,
+            SampleTime::Cycles_3,
         );
         adc.configure_channel(
-            &gpioa.pa0.into_analog(),
+            &gpioa.pa4.into_analog(),
             Sequence::from(2),
-            SampleTime::Cycles_15,
+            SampleTime::Cycles_3,
         );
         adc.configure_channel(
             &gpioa.pa3.into_analog(),
             Sequence::from(3),
-            SampleTime::Cycles_15,
+            SampleTime::Cycles_3,
+        );
+        adc.configure_channel(
+            &gpioc.pc2.into_analog(),
+            Sequence::from(4),
+            SampleTime::Cycles_3,
         );
         adc.configure_channel(
             &gpioa.pa2.into_analog(),
-            Sequence::from(4),
-            SampleTime::Cycles_15,
+            Sequence::from(5),
+            SampleTime::Cycles_3,
+        );
+        adc.configure_channel(
+            &gpioa.pa0.into_analog(),
+            Sequence::from(6),
+            SampleTime::Cycles_3,
+        );
+        adc.configure_channel(
+            &gpioc.pc3.into_analog(),
+            Sequence::from(7),
+            SampleTime::Cycles_3,
+        );
+        adc.configure_channel(
+            &gpioa.pa1.into_analog(),
+            Sequence::from(8),
+            SampleTime::Cycles_3,
+        );
+        // iref
+        adc.configure_channel(
+            &gpioa.pa7.into_analog(),
+            Sequence::from(9),
+            SampleTime::Cycles_3,
         );
         // current u, v, w
         adc.configure_channel(
-            &gpioa.pa7.into_analog(),
-            Sequence::from(5),
-            SampleTime::Cycles_15,
+            &gpiob.pb1.into_analog(),
+            Sequence::from(10),
+            SampleTime::Cycles_3,
         );
         adc.configure_channel(
-            &gpioa.pa6.into_analog(),
-            Sequence::from(6),
-            SampleTime::Cycles_15,
+            &gpiob.pb0.into_analog(),
+            Sequence::from(11),
+            SampleTime::Cycles_3,
         );
         adc.configure_channel(
-            &gpioa.pa5.into_analog(),
-            Sequence::from(7),
-            SampleTime::Cycles_15,
+            &gpioc.pc5.into_analog(),
+            Sequence::from(12),
+            SampleTime::Cycles_3,
         );
 
         // vbus
         adc.configure_channel(
-            &gpioa.pa4.into_analog(),
-            Sequence::from(8),
-            SampleTime::Cycles_15,
+            &gpioc.pc0.into_analog(),
+            Sequence::from(13),
+            SampleTime::Cycles_3,
         );
-
-        // temp
-        adc.configure_channel(&Temperature, Sequence::from(9), SampleTime::Cycles_15);
-
-        adc.enable_temperature_and_vref();
+        // motor temp
+        adc.configure_channel(
+            &gpioc.pc1.into_analog(),
+            Sequence::from(14),
+            SampleTime::Cycles_3,
+        );
+        // drive temp
+        adc.configure_channel(
+            &gpioc.pc4.into_analog(),
+            Sequence::from(15),
+            SampleTime::Cycles_3,
+        );
 
         let mut adc_transfer =
             Transfer::init_peripheral_to_memory(dma.0, adc, cx.local.adc_buffer2, None, config);
@@ -315,7 +344,7 @@ mod app {
                     u: ch_u,
                     v: ch_v,
                     w: ch_w,
-                    pwm_en: gpiob.pb15.into_push_pull_output()
+                    pwm_en: gpioc.pc6.into_push_pull_output()
                 }
             },
             init::Monotonics(mono),
@@ -408,7 +437,7 @@ mod app {
         let update = to_controller_update(&buffer, &position, &config);
         let mut pwm_req = controller.update(&update, &config);
 
-        if update.phase_currents.max_magnitude() > 10.0 {
+        if update.phase_currents.max_magnitude() > 20.0 {
             pwm_req.driver_enable = false;
         }
 

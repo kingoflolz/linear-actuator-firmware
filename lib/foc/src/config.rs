@@ -26,12 +26,12 @@ impl Config {
             motor_len_per_cycle: 19.0,
             encoder_len_per_cycle: 2.34375,
             calibration_length: 100.0,
-            calibration_speed: 1.0,
-            open_loop_voltage: 1.0,
+            calibration_speed: 0.1,
+            open_loop_voltage: 0.75,
             uvlo: 10.0,
             switching_frequency: 200e3,
             switching_clock_frequency: 100e6,
-            cycle_deadtime: 100e-9, // ~50ns is min controllable on time
+            cycle_deadtime: 300e-9, // ~50ns is min controllable on time
             control_frequency: 8e3,
 
             current_controller_k_p: 0.22e-4,
