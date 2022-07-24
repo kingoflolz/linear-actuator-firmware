@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 libm = "0.2.0"
 bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
+remote-obj = { path = "../../../remote-obj" }
 
 [dev-dependencies]
 rand = "0.8"

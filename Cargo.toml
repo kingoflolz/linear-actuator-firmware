@@ -23,7 +23,8 @@ libm = "0.2.0"
 foc = { path = "lib/foc" }
 common = { path = "lib/common" }
 encoder = { path = "lib/encoder" }
-framed = {version = "0.4.3", default-features = false}
+remote-obj = { path = "../remote-obj" }
+framed = { git = "https://github.com/kingoflolz/framed-rs.git", default-features = false}
 
 [dependencies.stm32f4xx-hal]
 version = "0.13.2"

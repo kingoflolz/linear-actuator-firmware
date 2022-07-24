@@ -1,3 +1,8 @@
+use remote_obj::*;
+use bincode::{Encode, Decode};
+
+#[derive(RemoteSetter, RemoteGetter)]
+#[remote(derive(Encode, Decode))]
 pub struct Config {
     // setup constants
     pub motor_len_per_cycle: f32, // mm per electrical cycle

@@ -6,9 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-framed = { path = "../../../framed-rs/framed" }
+framed = { git = "https://github.com/kingoflolz/framed-rs.git", default-features = false}
 serialport = "4.2.0"
 common = { path = "../common" }
 foc = { path = "../foc" }
 bincode = { version = "2.0.0-beta.1"}
 npy = "0.4.0"
+remote-obj = { path = "../../../remote-obj" }
+rusb = "0.9.1"

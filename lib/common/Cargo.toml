@@ -9,3 +9,4 @@ edition = "2021"
 bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
 foc = { path = "../foc" }
 encoder = { path = "../encoder" }
+remote-obj = { path = "../../../remote-obj" }

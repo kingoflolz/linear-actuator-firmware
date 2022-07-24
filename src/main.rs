@@ -50,7 +50,7 @@ mod app {
 
     impl MotorOutputBlock {
         fn set_duty(&mut self, pwm_req: &PWMCommand) {
-            if pwm_req.driver_enable {
+            if false {
                 self.u.set_duty(pwm_req.u_duty);
                 self.v.set_duty(pwm_req.v_duty);
                 self.w.set_duty(pwm_req.w_duty);
