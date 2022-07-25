@@ -1,69 +1,121 @@
-use serialport;
-use framed;
-use common::{Sample, to_controller_update};
-use foc::config::Config;
-use bincode;
-extern crate npy;
+use std::io::{BufReader, Read};
+use std::time::Duration;
+use egui::remap_clamp;
+use framed::bytes::Receiver;
 
-fn main() {
-    // let ports = serialport::available_ports().unwrap();
-    //
-    // for port in ports {
-    //     println!("{}", port.port_name);
-    // }
+use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, Result, TransferType, UsbContext};
+use common::Sample;
 
-    let mut arr: Vec<f32> = Vec::new();
+#[derive(Debug)]
+struct Endpoint {
+    config: u8,
+    iface: u8,
+    setting: u8,
+    address: u8,
+}
 
-    let bincode_config = bincode::config::standard()
-        .with_little_endian()
-        .with_fixed_int_encoding()
-        .skip_fixed_array_length();
+struct USBCDC {
+    context: Context,
+    device_handle: DeviceHandle<Context>,
+}
 
-    let mut codec = framed::bytes::Config::default();
+impl USBCDC {
+    pub fn new() -> Result<Self> {
+        let vid = 0x16c0;
+        let pid = 0x27dd;
 
-    let port = serialport::new("/dev/ttyACM21", 9600).open().unwrap();
+        let mut context = Context::new()?;
+        let mut device_handle = open_device(&mut context, vid, pid)?;
+        device_handle.reset()?;
 
-    let mut receiver = codec.to_receiver(port);
+        let has_kernel_driver = match device_handle.kernel_driver_active(1) {
+            Ok(true) => {
+                device_handle.detach_kernel_driver(1).ok();
+                true
+            }
+            _ => false,
+        };
 
-    let mut last_id: u16 = 0;
+        device_handle.claim_interface(1).unwrap();
 
-    let config = Config::new();
+        Ok(USBCDC {
+            context,
+            device_handle
+        })
+    }
+}
 
-    loop {
-        let frame = receiver.recv();
-        match frame {
-            Ok(frame) => {
-                let sample: Sample = bincode::decode_from_slice(
-                    &frame,
-                    bincode_config,
-                ).unwrap().0;
-                // if sample.id != last_id.wrapping_add(4) {
-                //     println!("sample mismatch: {} follows {}", sample.id, last_id);
-                // }
-                last_id = sample.id;
+impl Read for USBCDC {
+    fn read(&mut self, mut buf: &mut [u8]) -> std::io::Result<usize> {
+        let timeout = Duration::from_secs(1);
 
-                let update =  to_controller_update(&sample.adc, &None, &config);
+        self.device_handle.read_bulk(130, &mut buf, timeout).map_err(|x| std::io::ErrorKind::Other.into())
+    }
+}
 
-                if sample.id % 500 == 0 {
-                    // println!("pos: {:?}mm, pos tgt: {}, calib {:?}", sample.position, sample.position_target, sample.calibration);
-                    println!("{:?} {:?}", sample.pwm, update.phase_currents);
-                }
-                for i in sample.adc.iter() {
-                    arr.push(*i as f32);
-                }
-                if arr.len() > 1000000 {
-                    npy::to_file("save.npy", arr).unwrap();
-                    break
-                }
-            },
-            Err(framed::Error::Io(e)) => {
-                if e.kind() != std::io::ErrorKind::TimedOut {
-                    println!("breaking from io error: {:?}", e);
-                    break
-                }
-            },
-            _ => {}
+struct PacketReader {
+    reader: Receiver<BufReader<USBCDC>>
+}
+
+impl PacketReader {
+    fn new() -> Self {
+        let mut codec = framed::bytes::Config::default();
+        let reader = BufReader::with_capacity(16384, USBCDC::new().unwrap());
+        let receiver = codec.to_receiver(reader);
+
+        PacketReader {
+            reader: receiver
         }
     }
 
+    fn read(&mut self) -> Sample {
+        let bincode_config = bincode::config::standard()
+            .with_little_endian()
+            .with_fixed_int_encoding()
+            .skip_fixed_array_length();
+
+        loop {
+            match self.reader.recv() {
+                Ok(frame) => {
+                    let sample: Sample = bincode::decode_from_slice(
+                        &frame,
+                        bincode_config,
+                    ).unwrap().0;
+                    return sample
+                }
+                Err(_) => {}
+            }
+        }
+    }
+}
+
+fn main() {
+    let mut p = PacketReader::new();
+    let mut old_sample: u16 = 0;
+    for i in 0..100000 {
+        let s = p.read();
+        if old_sample.wrapping_add(1) != s.id {
+            println!("{} mismatch old: {}, new: {}", i, old_sample, s.id);
+        }
+        old_sample = s.id;
+        // println!("{}", i)
+    }
+}
+
+fn open_device<T: UsbContext>(
+    context: &mut T,
+    vid: u16,
+    pid: u16,
+) -> Result<DeviceHandle<T>> {
+    let devices = context.devices()?;
+
+    for device in devices.iter() {
+        let device_desc = device.device_descriptor()?;
+
+        if device_desc.vendor_id() == vid && device_desc.product_id() == pid {
+            return Ok(device.open()?);
+        }
+    }
+
+    panic!("device not found")
 }

@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(proc_macro_hygiene)]
 
 use panic_rtt_target as _;
 
@@ -31,6 +32,7 @@ mod app {
     use encoder::EncoderState;
 
     use heapless::spsc::{Consumer, Producer, Queue};
+    use bbqueue::BBBuffer;
 
     use usb_device::bus::UsbBusAllocator;
     use usb_device::prelude::*;
@@ -40,6 +42,9 @@ mod app {
     use framed;
 
     use common::*;
+
+    mod scope;
+    use scope::*;
 
     pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
@@ -75,19 +80,15 @@ mod app {
 
     #[shared]
     struct Shared {
-        serial: CdcAcmClass<'static, UsbBusType>,
-        usb_dev: UsbDevice<'static, UsbBusType>,
     }
+
+    const BUFFER_SIZE: usize = 8192;
 
     #[local]
     struct Local {
-        sample_id: u32,
-        p: Producer<'static, Sample, 64>,
-        c: Consumer<'static, Sample, 64>,
-
-        // timer_p: Producer<'static, PWMCommand, 32>,
-        // timer_c: Consumer<'static, PWMCommand, 32>,
-
+        p: ScopeProducer<BUFFER_SIZE, Sample>,
+        c: ScopeConsumer<BUFFER_SIZE>,
+        sample_id: u16,
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 16]>,
         controller: Controller,
@@ -100,8 +101,7 @@ mod app {
     adc_buffer2: [u16; 16] = [0; 16],
     ep_memory: [u32; 1024] = [0; 1024],
     usb_bus: Option < UsbBusAllocator < UsbBus < USB >> > = None,
-    q: Queue < Sample, 64 > = Queue::new(),
-    timer_q: Queue<PWMCommand, 32> = Queue::new()])]
+    bbq: BBBuffer< BUFFER_SIZE > = BBBuffer::new()])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         rtt_init_print!();
 
@@ -323,18 +323,16 @@ mod app {
         usb_idle_polling::spawn().ok().unwrap();
         rprintln!("spawned");
 
-        let (p, c) = cx.local.q.split();
-        // let (timer_p, timer_c) = cx.local.timer_q.split();
+        let (p, c) = get_scope(cx.local.bbq, serial, usb_dev);
+
         let config = Config::new();
         let controller = Controller::new(&config);
         (
-            Shared { serial, usb_dev },
+            Shared { },
             Local {
                 sample_id: 0,
                 p,
                 c,
-                // timer_p,
-                // timer_c,
                 adc_buffer: Some(cx.local.adc_buffer_),
                 adc_transfer,
                 config,
@@ -351,68 +349,9 @@ mod app {
         )
     }
 
-    fn poll_usb(
-        serial: &mut CdcAcmClass<'static, UsbBusType>,
-        usb_dev: &mut UsbDevice<'static, UsbBusType>,
-        queue: Option<&mut Consumer<'static, Sample, 64>>,
-    ) {
-        usb_dev.poll(&mut [serial]);
-        if let Some(c) = queue {
-            for _ in 0..16 {
-                match c.peek() {
-                    None => {
-                        break;
-                    }
-                    Some(s) => {
-                        let mut buf = [0; 64];
-                        let length = bincode::encode_into_slice(
-                            s,
-                            &mut buf,
-                            bincode::config::standard()
-                                .with_little_endian()
-                                .with_fixed_int_encoding()
-                                .skip_fixed_array_length(),
-                        )
-                            .unwrap();
-
-                        let mut codec = framed::bytes::Config::default().to_codec();
-                        let mut encoded_buf = [0; 64];
-                        let encoded_len = codec.encode_to_slice(&buf[0..length], &mut encoded_buf).unwrap();
-
-                        for _ in 0..16 {
-                            match serial.write_packet(&encoded_buf[0..encoded_len]) {
-                                Err(UsbError::WouldBlock) => {
-                                    rprintln!("w");
-                                    usb_dev.poll(&mut [serial]);
-                                },
-                                Ok(_) => {
-                                    rprintln!("p {}", c.len());
-                                    c.dequeue();
-                                    break;
-                                }
-                                Err(e) => {
-                                    rprintln!("err {:?}", e);
-                                }
-                            }
-                            usb_dev.poll(&mut [serial]);
-                        }
-                    }
-                }
-                usb_dev.poll(&mut [serial]);
-            }
-        }
-    }
-
-    #[task(shared = [serial, usb_dev], local = [c])]
+    #[task(local = [c], priority = 1)]
     fn usb_idle_polling(cx: usb_idle_polling::Context) {
-        let usb_idle_polling::Context { shared, local } = cx;
-
-        (shared.serial, shared.usb_dev).lock(
-            |serial: &mut CdcAcmClass<_>, usb_dev: &mut UsbDevice<_>| {
-                poll_usb(serial, usb_dev, Some(local.c))
-            },
-        );
-        usb_idle_polling::spawn_after(1000.micros()).ok();
+        cx.local.c.run();
     }
 
     #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, controller, config, pwm, encoder], priority = 5)]
@@ -447,14 +386,12 @@ mod app {
 
         pwm.set_duty(&pwm_req);
 
-        if *sample_id % 4 == 0 {
-            drop(p.enqueue(Sample {
-                id: *sample_id as u16,
-                adc: *buffer,
-                pwm: pwm_req.to_array(),
-                dq_currents: controller.get_dq(&update, config),
-            }));
-        }
+        p.tick(&Sample {
+            id: *sample_id,
+            adc: *buffer,
+            pwm: pwm_req.to_array(),
+            dq_currents: controller.get_dq(&update, config),
+        });
 
         *sample_id = sample_id.wrapping_add(1);
         *adc_buffer = Some(buffer);

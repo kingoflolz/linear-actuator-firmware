@@ -4,7 +4,6 @@ use foc::state_machine::ControllerUpdate;
 use foc::config::Config;
 use foc::transforms::{DQCurrents, PhaseCurrents};
 use encoder::EncoderOutput;
-use encoder::normalizer::Normalizer;
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub struct Sample {

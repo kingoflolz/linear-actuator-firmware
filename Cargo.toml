@@ -25,6 +25,7 @@ common = { path = "lib/common" }
 encoder = { path = "lib/encoder" }
 remote-obj = { path = "../remote-obj" }
 framed = { git = "https://github.com/kingoflolz/framed-rs.git", default-features = false}
+bbqueue = "0.5.1"
 
 [dependencies.stm32f4xx-hal]
 version = "0.13.2"
