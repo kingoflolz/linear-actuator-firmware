@@ -3,12 +3,13 @@ use crate::config::Config;
 use crate::open_loop_voltage::OpenLoopVoltageController;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use encoder::normalizer::{NormalizerBuilder, Normalizer};
+use remote_obj::*;
+use bincode::{Encode, Decode};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, RemoteGetter, RemoteSetter)]
+#[remote(derive(Encode, Decode))]
 pub enum EncoderCalibrationState {
-    Start {
-        wait: u32
-    },
+    Start (u32),
     ToEndstop,
     Calib1,
     Calib2,
@@ -16,6 +17,8 @@ pub enum EncoderCalibrationState {
     Done2,
 }
 
+#[derive(Debug, RemoteGetter, RemoteSetter)]
+#[remote(derive(Encode, Decode))]
 pub struct EncoderCalibrationController {
     pub state: EncoderCalibrationState,
     position_target: f32, // in units of electrical radians
@@ -24,6 +27,8 @@ pub struct EncoderCalibrationController {
     calib2_builder: NormalizerBuilder,
 }
 
+#[derive(Debug, RemoteGetter, RemoteSetter)]
+#[remote(derive(Encode, Decode))]
 pub struct EncoderCalibration {
     offset: f32
 }
@@ -37,7 +42,7 @@ impl EncoderCalibration {
 impl EncoderCalibrationController {
     pub fn new() -> EncoderCalibrationController {
         EncoderCalibrationController {
-            state: EncoderCalibrationState::Start {wait: 0},
+            state: EncoderCalibrationState::Start (0),
             position_target: 0.0,
             open_loop: OpenLoopVoltageController::new(),
             calib1_builder: NormalizerBuilder::new(),
@@ -96,9 +101,7 @@ impl EncoderCalibrationController {
         // rprintln!("{}, {:?}", self.open_loop_velocity.position, self.state);
 
         match &mut self.state {
-            EncoderCalibrationState::Start {
-                wait
-            } => {
+            EncoderCalibrationState::Start(wait) => {
                 *wait += 1;
                 if *wait > 1_000 {
                     self.state = EncoderCalibrationState::ToEndstop;

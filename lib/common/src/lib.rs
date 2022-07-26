@@ -1,16 +1,54 @@
 #![no_std]
 use bincode::{Decode, Encode};
+use bincode::de::Decoder;
+use bincode::enc::Encoder;
+use bincode::error::{DecodeError, EncodeError};
 use foc::state_machine::ControllerUpdate;
 use foc::config::Config;
 use foc::transforms::{DQCurrents, PhaseCurrents};
 use encoder::EncoderOutput;
+use remote_obj::*;
+use heapless::Vec;
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Sample {
     pub id: u16,
-    pub adc: [u16; 16],
-    pub pwm: [u16; 3],
-    pub dq_currents: Option<DQCurrents>,
+    pub buf: Vec<u8, 128>
+}
+
+impl Encode for Sample {
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        Encode::encode(&self.id, encoder)?;
+        Encode::encode(&(self.buf.len() as u8), encoder)?;
+        for i in self.buf.iter() {
+            Encode::encode(i, encoder)?;
+        }
+        Ok(())
+    }
+}
+
+impl Decode for Sample {
+    fn decode<D: Decoder>(decoder: &mut D) -> Result<Self, DecodeError> {
+        Ok(Self {
+            id: Decode::decode(decoder)?,
+            buf: {
+                let len: u8 = Decode::decode(decoder)?;
+                let mut x = Vec::new();
+                for _ in 0..len {
+                    x.push(Decode::decode(decoder)?);
+                }
+                x
+            }
+        })
+    }
+}
+
+#[derive(RemoteGetter)]
+#[remote(derive(Encode, Decode))]
+pub struct Container<'a> {
+    pub adc: &'a mut [u16; 16],
+    pub pwm: &'a mut [u16; 3],
+    pub controller: &'a mut foc::state_machine::Controller,
 }
 
 pub fn to_controller_update(adc_buf: &[u16; 16], position: &Option<EncoderOutput>, config: &Config) -> ControllerUpdate {

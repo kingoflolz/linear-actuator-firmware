@@ -40,6 +40,7 @@ mod app {
 
     use bincode;
     use framed;
+    use heapless::Vec;
 
     use common::*;
 
@@ -386,11 +387,15 @@ mod app {
 
         pwm.set_duty(&pwm_req);
 
+        let container = Container {
+            adc: buffer,
+            pwm: &mut pwm_req.to_array(),
+            controller
+        };
+
         p.tick(&Sample {
             id: *sample_id,
-            adc: *buffer,
-            pwm: pwm_req.to_array(),
-            dq_currents: controller.get_dq(&update, config),
+            buf: Vec::new(),
         });
 
         *sample_id = sample_id.wrapping_add(1);

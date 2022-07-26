@@ -3,7 +3,11 @@ use crate::config::Config;
 use crate::pid::DQCurrentController;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use crate::transforms::{DQCurrents, DQVoltages};
+use remote_obj::*;
+use bincode::{Encode, Decode};
 
+#[derive(Debug, RemoteGetter, RemoteSetter)]
+#[remote(derive(Encode, Decode))]
 pub struct FieldOrientedControl {
     cal: EncoderCalibration,
     current_controller: DQCurrentController,

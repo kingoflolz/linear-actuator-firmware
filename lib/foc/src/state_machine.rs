@@ -3,6 +3,8 @@ use crate::svm::IterativeSVM;
 use crate::calibration::EncoderCalibrationController;
 use crate::foc::FieldOrientedControl;
 use crate::transforms::{DQCurrents, PhaseCurrents};
+use remote_obj::*;
+use bincode::{Encode, Decode};
 
 pub struct VoltageControllerOutput {
     pub driver_enable: bool,
@@ -10,6 +12,8 @@ pub struct VoltageControllerOutput {
     pub beta: f32,
 }
 
+#[derive(Debug, RemoteGetter, RemoteSetter)]
+#[remote(derive(Encode, Decode))]
 pub enum VoltageController {
     Cal(EncoderCalibrationController),
     Foc(FieldOrientedControl),
@@ -47,6 +51,8 @@ impl VoltageController {
     }
 }
 
+#[derive(RemoteGetter)]
+#[remote(derive(Serialize, Deserialize))]
 pub struct Controller {
     svm: IterativeSVM,
     voltage_controller: VoltageController,

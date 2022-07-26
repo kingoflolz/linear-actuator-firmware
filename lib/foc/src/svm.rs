@@ -1,4 +1,6 @@
 use crate::state_machine::{VoltageControllerOutput, PWMCommand};
+use remote_obj::*;
+use bincode::{Encode, Decode};
 
 // inputs are alpha and beta voltages as fraction of vbus, outputs are duty cycles
 fn calculate_svm(alpha: f32, beta: f32) -> (f32, f32, f32, bool) {
@@ -138,7 +140,8 @@ fn round(x: f32) -> u16 {
     return (x + 0.5f32) as u16;
 }
 
-#[derive(Debug)]
+#[derive(Debug, RemoteGetter, RemoteSetter)]
+#[remote(derive(Encode, Decode))]
 pub struct IterativeSVM {
     pub residuals: [f32; 3],
     dead_time: u16, // dead time in duty cycle

@@ -130,6 +130,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcdd6821f45ff332b595d66d115924c97bf16635571633996ca877f41cd7757a"
 dependencies = [
  "bincode_derive",
+ "serde",
 ]
 
 [[package]]
@@ -184,7 +185,9 @@ dependencies = [
  "bincode",
  "encoder",
  "foc",
+ "heapless",
  "remote-obj",
+ "serde",
 ]
 
 [[package]]
@@ -944,6 +947,7 @@ checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 name = "remote-obj"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "remote-obj-derive",
 ]
 
