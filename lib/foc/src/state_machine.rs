@@ -90,17 +90,6 @@ impl Controller {
             }
         }
     }
-
-    pub fn get_dq(&self, update: &ControllerUpdate, config: &Config) -> Option<DQCurrents> {
-        match &self.voltage_controller {
-            VoltageController::Cal(_) => {
-                None
-            }
-            VoltageController::Foc(foc) => {
-                Some(foc.get_dq(update, config))
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,9 +106,11 @@ impl PWMCommand {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(RemoteGetter, RemoteSetter, Debug, Clone, PartialEq)]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct ControllerUpdate {
     pub phase_currents: PhaseCurrents,
     pub bus_voltage: f32,
+    #[remote(skip)]
     pub position: Option<f32>,
 }

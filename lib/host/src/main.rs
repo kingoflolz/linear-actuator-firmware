@@ -1,177 +1,141 @@
+mod comms;
+
 use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
 use std::time::Duration;
 use egui::remap_clamp;
 
 use core::hash::Hasher;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Arguments;
+use std::iter::zip;
 use std::sync::{Arc, mpsc};
 use std::sync::mpsc::{channel, Sender, Receiver, RecvTimeoutError};
 use std::thread::spawn;
-use remote_obj::getter;
+use remote_obj::prelude::*;
 
-use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Result, TransferType, UsbContext};
-use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter};
+use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Recipient, Result, TransferType, UsbContext};
+use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter, Container, ContainerValue};
+use crate::comms::{new_device_pair, new_interface};
 
+use eframe::egui;
+use egui::Key::P;
+use egui::plot::{Line, Plot, Values, Value as PlotValue, Legend};
 
-struct DeviceReader {
-    device_handle: Arc<DeviceHandle<GlobalContext>>,
-    channel: Sender<DeviceToHost>,
+struct Plotter {
+    lines: HashMap<ContainerGetter, VecDeque<(usize, f32)>>,
+    probes: Vec<ContainerGetter>,
+    receiver: Receiver<ScopePacket>,
+    sender: Sender<HostToDevice>,
+    subsampling: u32,
+    plot_time: f32,
 }
 
-impl DeviceReader {
-    fn run(self) {
-        struct Handle(Arc<DeviceHandle<GlobalContext>>);
-        impl Read for Handle {
-            fn read(&mut self, mut buf: &mut [u8]) -> std::io::Result<usize> {
-                let timeout = Duration::from_secs(1);
-                self.0.read_bulk(130, &mut buf, timeout).map_err(|_| std::io::ErrorKind::Other.into())
-            }
+impl Plotter {
+    pub fn new(receiver: Receiver<ScopePacket>, sender: Sender<HostToDevice>) -> Self {
+        sender.send(HostToDevice::ClearProbes);
+        Plotter {
+            lines: HashMap::new(),
+            probes: Vec::new(),
+            receiver,
+            sender,
+            subsampling: 1,
+            plot_time: 2.0
         }
+    }
 
-        let mut codec = framed::bytes::Config::default();
-        let reader = BufReader::with_capacity(16384, Handle(self.device_handle.clone()));
-        let mut receiver = codec.to_receiver(reader);
+    pub fn set_subsampling(&mut self, subsampling: u32) {
+        self.subsampling = subsampling;
+        self.sender.send(HostToDevice::ProbeInterval(subsampling)).unwrap();
+    }
 
-        loop {
-            match receiver.recv() {
-                Ok(packet) => {
-                    let decoded: DeviceToHost;
-                    match bincode::decode_from_slice(
-                        &packet,
-                        BINCODE_CFG,
-                    ) {
-                        Ok((p, len)) => {
-                            decoded = p;
-                            assert_eq!(packet.len(), len);
-                        }
-                        Err(_) => {
-                            println!("failed to decode packet {:?}", packet);
-                            continue;
-                        }
-                    }
-                    self.channel.send(decoded).unwrap();
-                }
-                Err(_) => {}
+    pub fn add_probe(&mut self, probe: ContainerGetter) {
+        self.probes.push(probe.clone());
+        self.sender.send(HostToDevice::AddProbe(probe)).unwrap();
+    }
+
+    pub fn insert_packet(&mut self, packet: ScopePacket) {
+        let results = packet.rehydrate(&self.probes);
+
+        for (r, v) in zip(results.iter(), self.probes.iter()) {
+            if !self.lines.contains_key(v) {
+                self.lines.insert(v.clone(), VecDeque::new());
             }
+            if let Some(result) = r {
+                self.lines.get_mut(v).unwrap().push_front((
+                    packet.id as usize,
+                    result.as_float().unwrap()
+                ));
+            }
+            self.lines.get_mut(v).unwrap().truncate((self.plot_time * 8000.0 / self.subsampling as f32) as usize);
         }
     }
 }
 
-struct DeviceWriter {
-    device_handle: Arc<DeviceHandle<GlobalContext>>,
-    channel: Receiver<HostToDevice>,
-}
+impl eframe::App for Plotter {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let mut plot = Plot::new("lines_demo").legend(Legend::default());
 
-impl DeviceWriter {
-    fn run(self) {
-        struct Handle(Arc<DeviceHandle<GlobalContext>>);
-        impl Write for Handle {
-            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                let timeout = Duration::from_secs(1);
-                let r = self.0.write_bulk(1, &buf, timeout).map_err(|_| std::io::ErrorKind::Other.into());
-                println!("write done");
-                r
+            while let Ok(packet) = self.receiver.try_recv() {
+                self.insert_packet(packet);
             }
 
-            fn flush(&mut self) -> std::io::Result<()> {
-                Ok(())
-            }
-        }
-
-        let mut codec = framed::bytes::Config::default();
-        let writer = BufWriter::with_capacity(1024, Handle(self.device_handle.clone()));
-        let mut sender = codec.to_sender(writer);
-
-        let timeout = Duration::from_millis(1);
-
-        loop {
-            match self.channel.recv_timeout(timeout) {
-                Ok(packet) => {
-                    println!("got packet {:?}", packet);
-                    let frame = bincode::encode_to_vec(
-                        packet,
-                        BINCODE_CFG,
-                    ).unwrap();
-
-                    sender.queue(&frame[..]).unwrap();
+            plot.show(ui, |plot_ui| {
+                for (getter, values) in &self.lines {
+                    let name = format!("{:?}", getter);
+                    let line = Line::new(Values::from_values_iter(
+                        values.iter().map(|(id, value)| PlotValue::new(*id as f64 / 8000.0, *value as f64))
+                    )).name(name);
+                    plot_ui.line(line);
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    sender.flush().unwrap();
-                }
-                Err(e) => {
-                    println!("{:?}", e);
-                    break;
-                }
-            }
-        }
+            });
+            ctx.request_repaint();
+        });
     }
 }
-
-pub fn new_device_pair() -> (Sender<HostToDevice>, Receiver<DeviceToHost>) {
-    let vid = 0x1209;
-    let pid = 0x0001;
-
-    let mut device_handle = open_device_with_vid_pid(vid, pid).expect("device not found");
-    device_handle.reset().unwrap();
-    let has_kernel_driver = match device_handle.kernel_driver_active(1) {
-        Ok(true) => {
-            device_handle.detach_kernel_driver(1).ok();
-            true
-        }
-        _ => false,
-    };
-
-    let device_handle = Arc::new(device_handle);
-
-    let (reader_send, reader_recv) = channel();
-    let (writer_send, writer_recv) = channel();
-
-    let read_handle = device_handle.clone();
-    spawn(move || {
-        let reader = DeviceReader {
-            device_handle: read_handle,
-            channel: reader_send,
-        };
-        reader.run();
-    });
-
-    let write_handle = device_handle.clone();
-    spawn(move || {
-        let writer = DeviceWriter {
-            device_handle: write_handle,
-            channel: writer_recv,
-        };
-        writer.run();
-    });
-    (writer_send, reader_recv)
-}
-
 
 fn main() {
-    let (s, r) = new_device_pair();
+    let (cmd_s, cmd_r, scope ) = new_interface();
 
-    let mut old_sample: u32 = 0;
+    // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[1]))).unwrap();
+    // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[2]))).unwrap();
+    // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[3]))).unwrap();
 
-    s.send(HostToDevice::ClearProbes);
-    s.send(HostToDevice::AddProbe(getter!(Container.adc[0]))).unwrap();
-    s.send(HostToDevice::AddProbe(getter!(Container.adc[1]))).unwrap();
-    s.send(HostToDevice::AddProbe(getter!(Container.adc[2]))).unwrap();
-    s.send(HostToDevice::AddProbe(getter!(Container.adc[3]))).unwrap();
+    let mut plotter = Plotter::new(scope, cmd_s);
+    plotter.set_subsampling(8);
+    plotter.plot_time = 5.0;
 
-    s.send(HostToDevice::Getter(getter!(Container.adc[0]))).unwrap();
+    // plotter.add_probe(getter!(Container.encoder::Running.normalized[0]));
+    // plotter.add_probe(getter!(Container.encoder::Running.normalized[1]));
+    // plotter.add_probe(getter!(Container.encoder::Running.normalized[2]));
+    // plotter.add_probe(getter!(Container.encoder::Running.normalized[3]));
+    // plotter.add_probe(getter!(Container.update.phase_currents.u));
+    // plotter.add_probe(getter!(Container.update.phase_currents.v));
+    // plotter.add_probe(getter!(Container.update.phase_currents.w));
+    //
+    // plotter.add_probe(getter!(Container.pwm[0]));
+    // plotter.add_probe(getter!(Container.pwm[1]));
+    // plotter.add_probe(getter!(Container.pwm[2]));
 
-    for i in 0..100000 {
-        let s = r.recv().unwrap();
-        if let DeviceToHost::Sample(s) = s {
-            if old_sample.wrapping_add(1) != s.id {
-                println!("{} mismatch old: {}, new: {}", i, old_sample, s.id);
-            }
-            old_sample = s.id;
-            if i % 1000 == 0 {
-                println!("{}, {}, {:b}", s.id, s.buf.len(), s.probe_valid);
-            }
-        } else {
-            println!("{:?}", s);
-        }
-    }
+    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.d));
+    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.q));
+    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.q_req));
+    //
+    // plotter.add_probe(getter!(Container.encoder::Running.position));
+
+    // plotter.add_probe(getter!(Container.adc[1]));
+    // plotter.add_probe(getter!(Container.adc[2]));
+    // plotter.add_probe(getter!(Container.adc[3]));
+    // plotter.add_probe(getter!(Container.adc[4]));
+    // plotter.add_probe(getter!(Container.adc[5]));
+    // plotter.add_probe(getter!(Container.adc[6]));
+    // plotter.add_probe(getter!(Container.adc[7]));
+    // plotter.add_probe(getter!(Container.adc[8]));
+
+    let options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Linear Motor GUI",
+        options,
+        Box::new(|_cc| Box::new(plotter)),
+    );
 }

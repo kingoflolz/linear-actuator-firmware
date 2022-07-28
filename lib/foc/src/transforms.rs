@@ -1,13 +1,15 @@
 use libm::sincosf;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use bincode::{Decode, Encode};
+use remote_obj::*;
 
 pub struct AlphaBetaCurrents {
     pub alpha: f32, // units of amps
     pub beta: f32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(RemoteGetter, RemoteSetter, Debug, Clone, PartialEq)]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct PhaseCurrents {
     pub u: f32, // units of amps
     pub v: f32,
@@ -48,7 +50,9 @@ impl PhaseCurrents {
     }
 }
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+
+#[derive(RemoteGetter, RemoteSetter, Encode, Decode, Debug, Clone, PartialEq, Default)]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct DQCurrents {
     pub d: f32, // units of amps
     pub q: f32,

@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+eframe = "0.18.0"
 framed = { git = "https://github.com/kingoflolz/framed-rs.git"}
 serialport = "4.2.0"
 common = { path = "../common" }

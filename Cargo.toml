@@ -35,7 +35,7 @@ features = ["rt", "stm32f411", "otg-fs", "usb_fs"]
 [profile.release]
 debug = 2
 panic = "abort"
-lto = true
+lto = false
 
 [profile.dev]
 panic = "abort"

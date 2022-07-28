@@ -65,7 +65,6 @@ impl EncoderCalibrationController {
     }
 
     pub fn is_done(&self) -> bool {
-        return false;
         match self.state {
             EncoderCalibrationState::Done1 |
             EncoderCalibrationState::Done2 => {

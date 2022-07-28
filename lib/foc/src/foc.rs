@@ -1,6 +1,6 @@
 use crate::calibration::EncoderCalibration;
 use crate::config::Config;
-use crate::pid::DQCurrentController;
+use crate::pid::{DQCurrentController, PIController};
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use crate::transforms::{DQCurrents, DQVoltages};
 use remote_obj::*;
@@ -11,6 +11,8 @@ use bincode::{Encode, Decode};
 pub struct FieldOrientedControl {
     cal: EncoderCalibration,
     current_controller: DQCurrentController,
+    dq_currents: DQCurrents,
+    q_req: f32,
 }
 
 impl FieldOrientedControl {
@@ -18,16 +20,9 @@ impl FieldOrientedControl {
         FieldOrientedControl {
             cal,
             current_controller: DQCurrentController::new(config),
+            dq_currents: DQCurrents::default(),
+            q_req: 0.0
         }
-    }
-
-    pub fn get_dq(&self, update: &ControllerUpdate, config: &Config) -> DQCurrents {
-        let pos = update.position.unwrap();
-        let angle = self.cal.to_angle(pos, config);
-
-        update.phase_currents
-            .clarke_transform()
-            .park_transform(angle)
     }
 
     pub fn update(&mut self, update: &ControllerUpdate, config: &Config) -> VoltageControllerOutput {
@@ -43,8 +38,9 @@ impl FieldOrientedControl {
         //      q: config.open_loop_voltage
         // };
 
-        let q = (- 50.0 - pos) / 2.0;
+        let q = -(- 50.0 - pos) / 2.0;
         let q = q.max(-8.0).min(8.0);
+        // let q = 2.0;
 
         let voltage_request = self.current_controller.update(
             &dq_currents,
@@ -52,6 +48,9 @@ impl FieldOrientedControl {
                 d: 0.0,
                 q,
             });
+
+        self.dq_currents = dq_currents;
+        self.q_req = q;
 
         voltage_request
             .inv_park_transform(angle)

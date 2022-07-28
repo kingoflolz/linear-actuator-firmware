@@ -51,7 +51,7 @@ mod app {
 
     impl MotorOutputBlock {
         fn set_duty(&mut self, pwm_req: &PWMCommand) {
-            if false {
+            if pwm_req.driver_enable {
                 self.u.set_duty(pwm_req.u_duty);
                 self.v.set_duty(pwm_req.v_duty);
                 self.w.set_duty(pwm_req.w_duty);
@@ -85,7 +85,6 @@ mod app {
     struct Local {
         p: ControllerComms<SEND_BUF, RECV_BUF>,
         c: USBCommunicator<SEND_BUF, RECV_BUF>,
-        sample_id: u16,
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 16]>,
         controller: Controller,
@@ -147,8 +146,8 @@ mod app {
         };
 
         // leds
-        gpiob.pb12.into_push_pull_output().set_high();
-        gpiob.pb13.into_push_pull_output().set_high();
+        // gpiob.pb12.into_push_pull_output().set_high();
+        // gpiob.pb13.into_push_pull_output().set_high();
         gpiob.pb14.into_push_pull_output().set_high();
         gpiob.pb15.into_push_pull_output().set_high();
 
@@ -328,7 +327,6 @@ mod app {
         (
             Shared { },
             Local {
-                sample_id: 0,
                 p,
                 c,
                 adc_buffer: Some(cx.local.adc_buffer_),
@@ -352,13 +350,12 @@ mod app {
         cx.local.c.run();
     }
 
-    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, sample_id, adc_transfer, controller, config, pwm, encoder], priority = 5)]
+    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, adc_transfer, controller, config, pwm, encoder], priority = 5)]
     fn dma(cx: dma::Context) {
         let dma::Context { local } = cx;
         let dma::LocalResources {
             adc_buffer,
             p,
-            sample_id,
             adc_transfer,
             controller,
             config,
@@ -386,15 +383,16 @@ mod app {
 
         let mut container = Container {
             adc: buffer,
-            pwm: &mut pwm_req.to_array(),
-            controller
+            pwm: &pwm_req.to_array(),
+            controller,
+            update: &update,
+            encoder,
         };
 
         p.tick(&mut container);
 
-        *sample_id = sample_id.wrapping_add(1);
         *adc_buffer = Some(buffer);
 
-        // rprintln!("u {} v {} w {}", u_d, v_d, w_d);
+        rprintln!("l");
     }
 }

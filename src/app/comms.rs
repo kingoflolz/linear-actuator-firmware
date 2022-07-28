@@ -12,6 +12,7 @@ pub struct ControllerComms<const SEND_BUF: usize, const RECV_BUF: usize> {
     send_p: Producer<'static, SEND_BUF>,
     recv_c: SpscConsumer<'static, HostToDevice, RECV_BUF>,
     sample_id: u32,
+    write_every: u32,
     probes: Vec<ContainerGetter, SCOPE_PROBES>,
 }
 
@@ -53,9 +54,16 @@ impl<const SEND_BUF: usize, const RECV_BUF: usize> ControllerComms<SEND_BUF, REC
                             let length = encode_and_frame(get_result, grant.buf());
                             grant.commit(length);
                         }
+                        HostToDevice::ProbeInterval(f) => {
+                            self.write_every = f
+                        }
                     }
                 }
             }
+        }
+
+        if self.sample_id % self.write_every != 0 {
+            return Ok(());
         }
 
         let packet = DeviceToHost::Sample(ScopePacket::new(self.sample_id, x, &self.probes));
@@ -182,6 +190,7 @@ pub fn get_comms_pair<'a, const SEND_BUF: usize, const RECV_BUF: usize>(
             send_p: s_p,
             recv_c: r_c,
             sample_id: 0,
+            write_every: u32::MAX,
             probes: Vec::new(),
         },
         USBCommunicator {

@@ -7,7 +7,7 @@ use bincode::error::{DecodeError, EncodeError};
 use foc::state_machine::ControllerUpdate;
 use foc::config::Config;
 use foc::transforms::{DQCurrents, PhaseCurrents};
-use encoder::EncoderOutput;
+use encoder::{EncoderOutput, EncoderState};
 use remote_obj::*;
 use heapless::Vec;
 use bitset_core::BitSet;
@@ -81,18 +81,23 @@ impl ScopePacket {
         }
     }
 
-    pub fn rehydrate(&self, getters: &[<Container as Getter>::GetterType]) -> Vec<<Container as Getter>::ValueType, SCOPE_PROBES> {
+    pub fn rehydrate(&self, getters: &[<Container as Getter>::GetterType]) -> Vec<Option<<Container as Getter>::ValueType>, SCOPE_PROBES> {
         assert!(getters.len() <= SCOPE_PROBES);
 
         let mut ret = Vec::new();
         let mut offset = 0;
         for (idx, probe) in getters.iter().enumerate() {
-            if self.probe_valid.bit_test(idx) {
-                if let Ok((value, field_length)) = <Container as Getter>::hydrate((*probe).clone(), &self.buf[offset..]) {
-                    offset += field_length;
-                    ret.push(value).unwrap();
-                }
-            }
+            ret.push(
+                if self.probe_valid.bit_test(idx) {
+                    if let Ok((value, field_length)) = <Container as Getter>::hydrate((*probe).clone(), &self.buf[offset..]) {
+                        offset += field_length;
+                        Some(value)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }).unwrap()
         }
         ret
     }
@@ -109,6 +114,7 @@ pub enum DeviceToHost {
 pub enum HostToDevice {
     AddProbe(CGetter),
     ClearProbes,
+    ProbeInterval(u32),
     Setter(CSetter),
     Getter(CGetter)
 }
@@ -116,9 +122,15 @@ pub enum HostToDevice {
 #[derive(RemoteGetter, RemoteSetter, Debug)]
 #[remote(derive(Encode, Decode, Debug))]
 pub struct Container<'a> {
-    pub adc: &'a mut [u16; 16],
-    pub pwm: &'a mut [u16; 3],
+    #[remote(read_only)]
+    pub adc: &'a [u16; 16],
+    #[remote(read_only)]
+    pub pwm: &'a [u16; 3],
     pub controller: &'a mut foc::state_machine::Controller,
+    #[remote(read_only)]
+    pub update: &'a ControllerUpdate,
+    #[remote(read_only)]
+    pub encoder: &'a EncoderState,
 }
 
 type CGetter = <Container<'static> as Getter>::GetterType;

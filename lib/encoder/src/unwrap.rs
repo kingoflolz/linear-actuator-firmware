@@ -1,4 +1,8 @@
-#[derive(Debug, Clone, Copy)]
+use remote_obj::prelude::*;
+use bincode::{Decode, Encode};
+
+#[derive(RemoteGetter, RemoteSetter, Debug, Clone, Copy, Default)]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct Unwrapper {
     previous: f32
 }
