@@ -1,5 +1,6 @@
 #![no_std]
 use bincode::{Decode, Encode};
+use bincode::config::{Configuration, LittleEndian, NoLimit, SkipFixedArrayLength, Fixint, Varint};
 use bincode::de::Decoder;
 use bincode::enc::Encoder;
 use bincode::error::{DecodeError, EncodeError};
@@ -9,16 +10,26 @@ use foc::transforms::{DQCurrents, PhaseCurrents};
 use encoder::EncoderOutput;
 use remote_obj::*;
 use heapless::Vec;
+use bitset_core::BitSet;
+
+pub static BINCODE_CFG: Configuration<LittleEndian, Varint, SkipFixedArrayLength, NoLimit> = bincode::config::standard()
+    .with_little_endian()
+    .with_variable_int_encoding()
+    .skip_fixed_array_length();
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Sample {
-    pub id: u16,
+pub struct ScopePacket {
+    pub id: u32,
+    pub probe_valid: u16,
     pub buf: Vec<u8, 128>
 }
 
-impl Encode for Sample {
+pub const SCOPE_PROBES: usize = 16;
+
+impl Encode for ScopePacket {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         Encode::encode(&self.id, encoder)?;
+        Encode::encode(&self.probe_valid, encoder)?;
         Encode::encode(&(self.buf.len() as u8), encoder)?;
         for i in self.buf.iter() {
             Encode::encode(i, encoder)?;
@@ -27,15 +38,16 @@ impl Encode for Sample {
     }
 }
 
-impl Decode for Sample {
+impl Decode for ScopePacket {
     fn decode<D: Decoder>(decoder: &mut D) -> Result<Self, DecodeError> {
         Ok(Self {
             id: Decode::decode(decoder)?,
+            probe_valid: Decode::decode(decoder)?,
             buf: {
                 let len: u8 = Decode::decode(decoder)?;
                 let mut x = Vec::new();
                 for _ in 0..len {
-                    x.push(Decode::decode(decoder)?);
+                    x.push(Decode::decode(decoder)?).unwrap();
                 }
                 x
             }
@@ -43,13 +55,76 @@ impl Decode for Sample {
     }
 }
 
-#[derive(RemoteGetter)]
-#[remote(derive(Encode, Decode))]
+impl ScopePacket {
+    pub fn new(id: u32, x: &Container, getters: &[<Container as Getter>::GetterType]) -> ScopePacket {
+        let mut buf = Vec::new();
+        buf.resize(buf.capacity(), 0).unwrap();
+
+        let mut length = 0;
+        let mut probe_valid = 0;
+
+        for (idx, probe) in getters.iter().enumerate() {
+            if let Ok(value) = x.get((*probe).clone()) {
+                if let Some(field_length) = value.dehydrate(&mut buf[length..]) {
+                    length += field_length;
+                    probe_valid.bit_set(idx);
+                }
+            }
+        };
+
+        buf.truncate(length);
+
+        ScopePacket {
+            id,
+            probe_valid,
+            buf
+        }
+    }
+
+    pub fn rehydrate(&self, getters: &[<Container as Getter>::GetterType]) -> Vec<<Container as Getter>::ValueType, SCOPE_PROBES> {
+        assert!(getters.len() <= SCOPE_PROBES);
+
+        let mut ret = Vec::new();
+        let mut offset = 0;
+        for (idx, probe) in getters.iter().enumerate() {
+            if self.probe_valid.bit_test(idx) {
+                if let Ok((value, field_length)) = <Container as Getter>::hydrate((*probe).clone(), &self.buf[offset..]) {
+                    offset += field_length;
+                    ret.push(value).unwrap();
+                }
+            }
+        }
+        ret
+    }
+}
+
+#[derive(Encode, Decode, Debug)]
+pub enum DeviceToHost {
+    Sample(ScopePacket),
+    SetterReply(Result<(), ()>),
+    GetterReply(Result<CValue, ()>)
+}
+
+#[derive(Encode, Decode, Debug)]
+pub enum HostToDevice {
+    AddProbe(CGetter),
+    ClearProbes,
+    Setter(CSetter),
+    Getter(CGetter)
+}
+
+#[derive(RemoteGetter, RemoteSetter, Debug)]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct Container<'a> {
     pub adc: &'a mut [u16; 16],
     pub pwm: &'a mut [u16; 3],
     pub controller: &'a mut foc::state_machine::Controller,
 }
+
+type CGetter = <Container<'static> as Getter>::GetterType;
+type CValue = <Container<'static> as Getter>::ValueType;
+
+type CSetter = <Container<'static> as Setter>::SetterType;
 
 pub fn to_controller_update(adc_buf: &[u16; 16], position: &Option<EncoderOutput>, config: &Config) -> ControllerUpdate {
     fn adc_to_voltage(adc: u16) -> f32 {

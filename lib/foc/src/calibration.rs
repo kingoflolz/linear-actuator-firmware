@@ -7,7 +7,7 @@ use remote_obj::*;
 use bincode::{Encode, Decode};
 
 #[derive(Debug, Clone, Eq, PartialEq, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub enum EncoderCalibrationState {
     Start (u32),
     ToEndstop,
@@ -18,7 +18,7 @@ pub enum EncoderCalibrationState {
 }
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct EncoderCalibrationController {
     pub state: EncoderCalibrationState,
     position_target: f32, // in units of electrical radians
@@ -28,7 +28,7 @@ pub struct EncoderCalibrationController {
 }
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct EncoderCalibration {
     offset: f32
 }

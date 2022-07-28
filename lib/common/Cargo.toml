@@ -12,3 +12,4 @@ foc = { path = "../foc" }
 encoder = { path = "../encoder" }
 remote-obj = { path = "../../../remote-obj" }
 heapless = "0.7.5"
+bitset-core = {version = "0.1.1", default-features = false}

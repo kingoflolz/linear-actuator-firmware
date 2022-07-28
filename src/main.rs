@@ -14,7 +14,6 @@ mod app {
         adc::{
             Adc,
             config::{AdcConfig, Dma, SampleTime, Scan, Sequence, Clock, ExternalTrigger, TriggerMode},
-            Temperature,
         },
         dma::{config::DmaConfig, PeripheralToMemory, Stream0, StreamsTuple, Transfer},
         nb::block,
@@ -31,21 +30,17 @@ mod app {
 
     use encoder::EncoderState;
 
-    use heapless::spsc::{Consumer, Producer, Queue};
+    use heapless::spsc::Queue;
     use bbqueue::BBBuffer;
 
     use usb_device::bus::UsbBusAllocator;
     use usb_device::prelude::*;
     use usbd_serial::CdcAcmClass;
 
-    use bincode;
-    use framed;
-    use heapless::Vec;
-
     use common::*;
 
-    mod scope;
-    use scope::*;
+    mod comms;
+    use comms::*;
 
     pub struct MotorOutputBlock {
         u: PwmChannel<TIM1, 0_u8>,
@@ -83,12 +78,13 @@ mod app {
     struct Shared {
     }
 
-    const BUFFER_SIZE: usize = 8192;
+    const SEND_BUF: usize = 8192;
+    const RECV_BUF: usize = 32;
 
     #[local]
     struct Local {
-        p: ScopeProducer<BUFFER_SIZE, Sample>,
-        c: ScopeConsumer<BUFFER_SIZE>,
+        p: ControllerComms<SEND_BUF, RECV_BUF>,
+        c: USBCommunicator<SEND_BUF, RECV_BUF>,
         sample_id: u16,
         adc_transfer: DMATransfer,
         adc_buffer: Option<&'static mut [u16; 16]>,
@@ -102,7 +98,8 @@ mod app {
     adc_buffer2: [u16; 16] = [0; 16],
     ep_memory: [u32; 1024] = [0; 1024],
     usb_bus: Option < UsbBusAllocator < UsbBus < USB >> > = None,
-    bbq: BBBuffer< BUFFER_SIZE > = BBBuffer::new()])]
+    bbq: BBBuffer< SEND_BUF > = BBBuffer::new(),
+    cmd_q: Queue< HostToDevice, RECV_BUF > = Queue::new()])]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         rtt_init_print!();
 
@@ -192,7 +189,7 @@ mod app {
 
         let mut usb_dev = UsbDeviceBuilder::new(
             cx.local.usb_bus.as_ref().unwrap(),
-            UsbVidPid(0x16c0, 0x27dd),
+            UsbVidPid(0x1209, 0x0001),
         )
         .manufacturer("Fake company")
         .product("Serial port")
@@ -324,7 +321,7 @@ mod app {
         usb_idle_polling::spawn().ok().unwrap();
         rprintln!("spawned");
 
-        let (p, c) = get_scope(cx.local.bbq, serial, usb_dev);
+        let (p, c) = get_comms_pair(cx.local.bbq, cx.local.cmd_q, serial, usb_dev);
 
         let config = Config::new();
         let controller = Controller::new(&config);
@@ -387,16 +384,13 @@ mod app {
 
         pwm.set_duty(&pwm_req);
 
-        let container = Container {
+        let mut container = Container {
             adc: buffer,
             pwm: &mut pwm_req.to_array(),
             controller
         };
 
-        p.tick(&Sample {
-            id: *sample_id,
-            buf: Vec::new(),
-        });
+        p.tick(&mut container);
 
         *sample_id = sample_id.wrapping_add(1);
         *adc_buffer = Some(buffer);

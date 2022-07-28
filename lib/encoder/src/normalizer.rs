@@ -2,7 +2,7 @@ use bincode::{Decode, Encode};
 use remote_obj::*;
 
 #[derive(Debug, Clone, Copy, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct NormalizerBuilder {
     n: u32,
     k: f32,

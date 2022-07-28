@@ -141,7 +141,7 @@ fn round(x: f32) -> u16 {
 }
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct IterativeSVM {
     pub residuals: [f32; 3],
     dead_time: u16, // dead time in duty cycle

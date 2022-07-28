@@ -26,6 +26,7 @@ encoder = { path = "lib/encoder" }
 remote-obj = { path = "../remote-obj" }
 framed = { git = "https://github.com/kingoflolz/framed-rs.git", default-features = false}
 bbqueue = "0.5.1"
+rustc-hash = { version = "1.0", default-features = false }
 
 [dependencies.stm32f4xx-hal]
 version = "0.13.2"
@@ -34,6 +35,7 @@ features = ["rt", "stm32f411", "otg-fs", "usb_fs"]
 [profile.release]
 debug = 2
 panic = "abort"
+lto = true
 
 [profile.dev]
 panic = "abort"

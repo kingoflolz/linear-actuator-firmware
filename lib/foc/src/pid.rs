@@ -4,7 +4,7 @@ use remote_obj::*;
 use bincode::{Encode, Decode};
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct PController {
     k_p: f32,
 }
@@ -20,7 +20,7 @@ impl PController {
 }
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct PIController {
     k_i: f32,
     i_error: f32,
@@ -43,7 +43,7 @@ impl PIController {
 }
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct DQCurrentController {
     d_controller: PIController,
     q_controller: PIController,

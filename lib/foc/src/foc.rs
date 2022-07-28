@@ -7,7 +7,7 @@ use remote_obj::*;
 use bincode::{Encode, Decode};
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct FieldOrientedControl {
     cal: EncoderCalibration,
     current_controller: DQCurrentController,

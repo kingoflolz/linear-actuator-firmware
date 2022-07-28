@@ -13,7 +13,7 @@ pub struct VoltageControllerOutput {
 }
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
-#[remote(derive(Encode, Decode))]
+#[remote(derive(Encode, Decode, Debug))]
 pub enum VoltageController {
     Cal(EncoderCalibrationController),
     Foc(FieldOrientedControl),
@@ -51,8 +51,8 @@ impl VoltageController {
     }
 }
 
-#[derive(RemoteGetter)]
-#[remote(derive(Serialize, Deserialize))]
+#[derive(RemoteGetter, RemoteSetter, Debug)]
+#[remote(derive(Encode, Decode, Debug))]
 pub struct Controller {
     svm: IterativeSVM,
     voltage_controller: VoltageController,
