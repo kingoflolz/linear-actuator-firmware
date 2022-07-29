@@ -23,6 +23,12 @@ pub struct Config {
 
     pub current_controller_k_p: f32,
     pub current_controller_k_i: f32,
+
+    pub vel_controller_k_p: f32,
+    pub vel_controller_k_i: f32,
+    pub pos_controller_k_p: f32,
+
+    pub curr_limit: f32,
 }
 
 impl Config {
@@ -40,7 +46,12 @@ impl Config {
             control_frequency: 8e3,
 
             current_controller_k_p: 0.22e-4,
-            current_controller_k_i: 100.0 * 60e-3 / 8e3
+            current_controller_k_i: 100.0 * 60e-3 / 8e3,
+            vel_controller_k_p: 1.0,
+            vel_controller_k_i: 1.0 / 8e3,
+            pos_controller_k_p: 1.0,
+
+            curr_limit: 8.0
         }
     }
 }

@@ -138,7 +138,7 @@ type CValue = <Container<'static> as Getter>::ValueType;
 
 type CSetter = <Container<'static> as Setter>::SetterType;
 
-pub fn to_controller_update(adc_buf: &[u16; 16], position: &Option<EncoderOutput>, config: &Config) -> ControllerUpdate {
+pub fn to_controller_update(adc_buf: &[u16; 16], position: Option<EncoderOutput>, config: &Config) -> ControllerUpdate {
     fn adc_to_voltage(adc: u16) -> f32 {
         adc as f32 / 4096.0 * 3.3
     }
@@ -160,8 +160,6 @@ pub fn to_controller_update(adc_buf: &[u16; 16], position: &Option<EncoderOutput
             w: adc_to_current(adc_buf[12] as i16 - adc_buf[9] as i16),
         }.normalize(),
         bus_voltage: vbus,
-        position: position.clone().map(|position|
-            position.position / core::f32::consts::TAU * config.encoder_len_per_cycle
-        ),
+        position: position.map(|x| x.multiply(config.encoder_len_per_cycle / core::f32::consts::TAU))
     }
 }

@@ -5,6 +5,7 @@ use crate::foc::FieldOrientedControl;
 use crate::transforms::{DQCurrents, PhaseCurrents};
 use remote_obj::*;
 use bincode::{Encode, Decode};
+use encoder::EncoderOutput;
 
 pub struct VoltageControllerOutput {
     pub driver_enable: bool,
@@ -112,5 +113,5 @@ pub struct ControllerUpdate {
     pub phase_currents: PhaseCurrents,
     pub bus_voltage: f32,
     #[remote(skip)]
-    pub position: Option<f32>,
+    pub position: Option<EncoderOutput>,
 }

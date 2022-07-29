@@ -14,43 +14,52 @@ use std::thread::spawn;
 use remote_obj::prelude::*;
 
 use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Recipient, Result, TransferType, UsbContext};
-use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter, Container, ContainerValue};
-use crate::comms::{new_device_pair, new_interface};
+use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter, Container, ContainerValue, ContainerSetter};
+use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interface};
 
 use eframe::egui;
-use egui::Key::P;
 use egui::plot::{Line, Plot, Values, Value as PlotValue, Legend};
 
 struct Plotter {
     lines: HashMap<ContainerGetter, VecDeque<(usize, f32)>>,
     probes: Vec<ContainerGetter>,
     receiver: Receiver<ScopePacket>,
-    sender: Sender<HostToDevice>,
+    arb: Sender<ArbiterReq>,
     subsampling: u32,
     plot_time: f32,
+    pos_setpoint: CachedGetterSetter,
 }
 
 impl Plotter {
-    pub fn new(receiver: Receiver<ScopePacket>, sender: Sender<HostToDevice>) -> Self {
-        sender.send(HostToDevice::ClearProbes);
+    pub fn new(receiver: Receiver<ScopePacket>, arb: Sender<ArbiterReq>) -> Self {
+        ArbiterReq::other(HostToDevice::ClearProbes, &arb);
         Plotter {
             lines: HashMap::new(),
             probes: Vec::new(),
             receiver,
-            sender,
+            arb: arb.clone(),
             subsampling: 1,
-            plot_time: 2.0
+            plot_time: 2.0,
+            pos_setpoint: {
+                CachedGetterSetter::new(
+                    getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint),
+                    Box::new(|v| {
+                        setter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint = v)
+                    }),
+                    arb.clone()
+                )
+            }
         }
     }
 
     pub fn set_subsampling(&mut self, subsampling: u32) {
         self.subsampling = subsampling;
-        self.sender.send(HostToDevice::ProbeInterval(subsampling)).unwrap();
+        ArbiterReq::other(HostToDevice::ProbeInterval(subsampling), &self.arb);
     }
 
     pub fn add_probe(&mut self, probe: ContainerGetter) {
         self.probes.push(probe.clone());
-        self.sender.send(HostToDevice::AddProbe(probe)).unwrap();
+        ArbiterReq::other(HostToDevice::AddProbe(probe), &self.arb);
     }
 
     pub fn insert_packet(&mut self, packet: ScopePacket) {
@@ -76,11 +85,11 @@ impl eframe::App for Plotter {
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut plot = Plot::new("lines_demo").legend(Legend::default());
 
-            while let Ok(packet) = self.receiver.try_recv() {
-                self.insert_packet(packet);
-            }
+            let slider = egui::Slider::from_get_set(-100.0..=0.0, self.pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
+            ui.add(slider);
 
-            plot.show(ui, |plot_ui| {
+
+            let r = plot.show(ui, |plot_ui| {
                 for (getter, values) in &self.lines {
                     let name = format!("{:?}", getter);
                     let line = Line::new(Values::from_values_iter(
@@ -89,20 +98,25 @@ impl eframe::App for Plotter {
                     plot_ui.line(line);
                 }
             });
+
+            while let Ok(packet) = self.receiver.try_recv() {
+                self.insert_packet(packet);
+            }
+
             ctx.request_repaint();
         });
     }
 }
 
 fn main() {
-    let (cmd_s, cmd_r, scope ) = new_interface();
+    let (arb, scope ) = new_interface();
 
     // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[1]))).unwrap();
     // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[2]))).unwrap();
     // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[3]))).unwrap();
 
-    let mut plotter = Plotter::new(scope, cmd_s);
-    plotter.set_subsampling(8);
+    let mut plotter = Plotter::new(scope, arb);
+    plotter.set_subsampling(16);
     plotter.plot_time = 5.0;
 
     // plotter.add_probe(getter!(Container.encoder::Running.normalized[0]));
@@ -117,11 +131,12 @@ fn main() {
     // plotter.add_probe(getter!(Container.pwm[1]));
     // plotter.add_probe(getter!(Container.pwm[2]));
 
-    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.d));
-    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.q));
-    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.q_req));
-    //
-    // plotter.add_probe(getter!(Container.encoder::Running.position));
+    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.d));
+    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.q));
+    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.q_req));
+    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint));
+    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.position));
+    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.velocity));
 
     // plotter.add_probe(getter!(Container.adc[1]));
     // plotter.add_probe(getter!(Container.adc[2]));

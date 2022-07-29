@@ -368,7 +368,7 @@ mod app {
 
         let position = encoder.update([buffer[1] as f32, buffer[2] as f32, buffer[3] as f32, buffer[4] as f32]);
 
-        let update = to_controller_update(&buffer, &position, &config);
+        let update = to_controller_update(&buffer, position, &config);
         let mut pwm_req = controller.update(&update, &config);
 
         if update.phase_currents.max_magnitude() > 20.0 {

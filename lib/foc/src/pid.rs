@@ -6,7 +6,7 @@ use bincode::{Encode, Decode};
 #[derive(Debug, RemoteGetter, RemoteSetter)]
 #[remote(derive(Encode, Decode, Debug))]
 pub struct PController {
-    k_p: f32,
+    pub k_p: f32,
 }
 
 impl PController {
@@ -22,9 +22,9 @@ impl PController {
 #[derive(Debug, RemoteGetter, RemoteSetter)]
 #[remote(derive(Encode, Decode, Debug))]
 pub struct PIController {
-    k_i: f32,
-    i_error: f32,
-    p_controller: PController,
+    pub k_i: f32,
+    pub i_error: f32,
+    pub p_controller: PController,
 }
 
 impl PIController {
@@ -60,7 +60,12 @@ impl DQCurrentController {
         }
     }
 
-    pub fn update(&mut self, current_inputs: &DQCurrents, current_requests: &DQCurrents) -> DQVoltages {
+    pub fn update(&mut self, current_inputs: &DQCurrents, current_requests: &DQCurrents, config: &Config) -> DQVoltages {
+        self.d_controller.k_i = config.current_controller_k_i;
+        self.q_controller.k_i = config.current_controller_k_i;
+        self.d_controller.p_controller.k_p = config.current_controller_k_p;
+        self.q_controller.p_controller.k_p = config.current_controller_k_p;
+
         DQVoltages {
             d: -self.d_controller.update(-(current_inputs.d - current_requests.d)),
             q: -self.q_controller.update(-(current_inputs.q - current_requests.q)),

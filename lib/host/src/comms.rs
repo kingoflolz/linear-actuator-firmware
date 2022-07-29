@@ -7,11 +7,10 @@ use std::fmt::Arguments;
 use std::sync::{Arc, mpsc};
 use std::sync::mpsc::{channel, Sender, Receiver, RecvTimeoutError};
 use std::thread::spawn;
-use remote_obj::getter;
 
-use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Result, TransferType, UsbContext};
-use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter};
-
+use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, TransferType, UsbContext};
+use common::*;
+use remote_obj::prelude::*;
 
 struct DeviceReader {
     device_handle: Arc<DeviceHandle<GlobalContext>>,
@@ -146,7 +145,91 @@ pub fn new_device_pair() -> (Sender<HostToDevice>, Receiver<DeviceToHost>) {
     (writer_send, reader_recv)
 }
 
-pub fn new_interface() -> (Sender<HostToDevice>, Receiver<DeviceToHost>, Receiver<ScopePacket>) {
+
+pub enum ArbiterReq {
+    Getter(ContainerGetter, Sender<Result<ContainerValue, ()>>),
+    Setter(ContainerSetter, Sender<Result<(), ()>>),
+    Other(HostToDevice)
+}
+
+impl ArbiterReq {
+    pub fn get(getter: ContainerGetter, sender: &Sender<ArbiterReq>) -> Result<f32, ()> {
+        let timeout = Duration::from_millis(1000);
+        let (s, r) = channel();
+        let req = ArbiterReq::Getter(getter, s);
+        sender.send(req).unwrap();
+        r.recv_timeout(timeout).unwrap().map(|x| x.as_float().unwrap())
+    }
+
+    pub fn set_async(setter: ContainerSetter, sender: &Sender<ArbiterReq>) {
+        let (s, r) = channel();
+        let req = ArbiterReq::Setter(setter, s);
+        sender.send(req).unwrap();
+    }
+
+    pub fn other(x: HostToDevice, sender: &Sender<ArbiterReq>) {
+        match x {
+            HostToDevice::AddProbe(_) | HostToDevice::ClearProbes | HostToDevice::ProbeInterval(_) => {}
+            _ => unreachable!()
+        }
+        sender.send(ArbiterReq::Other(x)).unwrap();
+    }
+}
+
+pub struct Arbiter {
+    cmd_s: Sender<HostToDevice>,
+    cmd_r: Receiver<DeviceToHost>,
+
+    receiver: Receiver<ArbiterReq>
+}
+
+impl Arbiter {
+    pub fn start(cmd_s: Sender<HostToDevice>, cmd_r: Receiver<DeviceToHost>) -> Sender<ArbiterReq> {
+        let (sender, receiver) = channel();
+        Arbiter {
+            cmd_s,
+            cmd_r,
+            receiver,
+        }.run();
+
+        sender
+    }
+
+    fn run(self) {
+        spawn(move || {
+            let timeout = Duration::from_millis(1000);
+            for req in self.receiver {
+                match req {
+                    ArbiterReq::Getter(g, reply) => {
+                        self.cmd_s.send(HostToDevice::Getter(g)).unwrap();
+                        let r = self.cmd_r.recv_timeout(timeout).unwrap();
+                        match r {
+                            DeviceToHost::GetterReply(r) => {
+                                let _ = reply.send(r);
+                            }
+                            _ => unreachable!()
+                        }
+                    }
+                    ArbiterReq::Setter(s, reply) => {
+                        self.cmd_s.send(HostToDevice::Setter(s)).unwrap();
+                        let r = self.cmd_r.recv_timeout(timeout).unwrap();
+                        match r {
+                            DeviceToHost::SetterReply(r) => {
+                                let _ = reply.send(r);
+                            }
+                            _ => unreachable!()
+                        }
+                    }
+                    ArbiterReq::Other(o) => {
+                        self.cmd_s.send(o).unwrap();
+                    }
+                }
+            }
+        });
+    }
+}
+
+pub fn new_interface() -> (Sender<ArbiterReq>, Receiver<ScopePacket>) {
     let (writer_send, reader_recv) = new_device_pair();
     let (scope_send, scope_recv) = channel();
     let (reader_recv_fwd_send, reader_recv_fwd_recv) = channel();
@@ -164,5 +247,41 @@ pub fn new_interface() -> (Sender<HostToDevice>, Receiver<DeviceToHost>, Receive
         };
     });
 
-    (writer_send, reader_recv_fwd_recv, scope_recv)
+    (Arbiter::start(writer_send, reader_recv_fwd_recv), scope_recv)
+}
+
+pub struct CachedGetterSetter {
+    getter: ContainerGetter,
+    setter: Box<dyn Fn(f32) -> ContainerSetter>,
+    cached_value: f32,
+    arb: Sender<ArbiterReq>
+}
+
+impl CachedGetterSetter {
+    pub fn new(getter: ContainerGetter,
+               setter: Box<dyn Fn(f32) -> ContainerSetter>,
+               arb: Sender<ArbiterReq>) -> Self {
+        let cached_value = ArbiterReq::get(getter, &arb).unwrap();
+        println!("{:?}: {}", getter, cached_value);
+        CachedGetterSetter {
+            getter,
+            setter,
+            cached_value,
+            arb
+        }
+    }
+
+    pub fn getter_setter(&mut self) -> impl FnMut(Option<f64>) -> f64 + '_ {
+        |x| {
+            if let Some(x) = x {
+                let setter = (self.setter)(x as f32);
+                ArbiterReq::set_async(
+                    setter,
+                    &self.arb
+                );
+                self.cached_value = x as f32;
+            };
+            self.cached_value as f64
+        }
+    }
 }
