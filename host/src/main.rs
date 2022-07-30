@@ -1,4 +1,5 @@
 mod comms;
+mod autocomplete;
 
 use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
 use std::time::Duration;
@@ -19,6 +20,7 @@ use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interfac
 
 use eframe::egui;
 use egui::plot::{Line, Plot, Values, Value as PlotValue, Legend};
+use crate::autocomplete::Autocomplete;
 
 struct Plotter {
     lines: HashMap<ContainerGetter, VecDeque<(usize, f32)>>,
@@ -88,10 +90,9 @@ impl eframe::App for Plotter {
             let slider = egui::Slider::from_get_set(-100.0..=0.0, self.pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
             ui.add(slider);
 
-
             let r = plot.show(ui, |plot_ui| {
                 for (getter, values) in &self.lines {
-                    let name = format!("{:?}", getter);
+                    let name = format!("{}", getter);
                     let line = Line::new(Values::from_values_iter(
                         values.iter().map(|(id, value)| PlotValue::new(*id as f64 / 8000.0, *value as f64))
                     )).name(name);

@@ -9,11 +9,11 @@ edition = "2021"
 eframe = "0.18.0"
 framed = { git = "https://github.com/kingoflolz/framed-rs.git"}
 serialport = "4.2.0"
-common = { path = "../common" }
-foc = { path = "../foc" }
+common = { path = "../lib/common" }
+foc = { path = "../lib/foc" }
 bincode = { version = "2.0.0-beta.1"}
 npy = "0.4.0"
-remote-obj = { path = "../../../remote-obj" }
+remote-obj = { path = "../../remote-obj" }
 rusb = "0.9.1"
 # rusb = { git = "https://github.com/kevinmehall/rusb.git", branch = "km-pipe-approach" }
 egui = "0.18.1"
