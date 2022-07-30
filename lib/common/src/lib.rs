@@ -56,7 +56,7 @@ impl Decode for ScopePacket {
 }
 
 impl ScopePacket {
-    pub fn new(id: u32, x: &Container, getters: &[<Container as Getter>::GetterType]) -> ScopePacket {
+    pub fn new(id: u32, x: &Container, getters: &[<Container as RemoteGet>::GetterType]) -> ScopePacket {
         let mut buf = Vec::new();
         buf.resize(buf.capacity(), 0).unwrap();
 
@@ -81,7 +81,7 @@ impl ScopePacket {
         }
     }
 
-    pub fn rehydrate(&self, getters: &[<Container as Getter>::GetterType]) -> Vec<Option<<Container as Getter>::ValueType>, SCOPE_PROBES> {
+    pub fn rehydrate(&self, getters: &[<Container as RemoteGet>::GetterType]) -> Vec<Option<<Container as RemoteGet>::ValueType>, SCOPE_PROBES> {
         assert!(getters.len() <= SCOPE_PROBES);
 
         let mut ret = Vec::new();
@@ -89,7 +89,7 @@ impl ScopePacket {
         for (idx, probe) in getters.iter().enumerate() {
             ret.push(
                 if self.probe_valid.bit_test(idx) {
-                    if let Ok((value, field_length)) = <Container as Getter>::hydrate((*probe).clone(), &self.buf[offset..]) {
+                    if let Ok((value, field_length)) = <Container as RemoteGet>::hydrate((*probe).clone(), &self.buf[offset..]) {
                         offset += field_length;
                         Some(value)
                     } else {
@@ -133,10 +133,10 @@ pub struct Container<'a> {
     pub encoder: &'a EncoderState,
 }
 
-type CGetter = <Container<'static> as Getter>::GetterType;
-type CValue = <Container<'static> as Getter>::ValueType;
+type CGetter = <Container<'static> as RemoteGet>::GetterType;
+type CValue = <Container<'static> as RemoteGet>::ValueType;
 
-type CSetter = <Container<'static> as Setter>::SetterType;
+type CSetter = <Container<'static> as RemoteSet>::SetterType;
 
 pub fn to_controller_update(adc_buf: &[u16; 16], position: Option<EncoderOutput>, config: &Config) -> ControllerUpdate {
     fn adc_to_voltage(adc: u16) -> f32 {
