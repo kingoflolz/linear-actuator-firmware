@@ -1,6 +1,5 @@
 use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
 use std::time::Duration;
-use egui::remap_clamp;
 
 use core::hash::Hasher;
 use std::fmt::Arguments;

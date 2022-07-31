@@ -4,11 +4,10 @@ mod channel_selector;
 mod scope_interface;
 
 use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
-use std::time::Duration;
-use egui::remap_clamp;
+use std::time::{Duration, Instant};
 
 use core::hash::Hasher;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Arguments;
 use std::iter::zip;
 use std::sync::{Arc, mpsc};
@@ -21,19 +20,24 @@ use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGett
 use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interface};
 
 use eframe::egui;
-use egui::plot::{Line, Plot, Values, Value as PlotValue, Legend};
+use egui::plot::{Line, Plot, Legend, PlotPoints};
 use crate::channel_selector::ChannelSelector;
 use crate::scope_interface::ScopeInterface;
 
 struct Plotter {
     lines: HashMap<ContainerGetter, VecDeque<(u32, f32)>>,
+    lines_history: HashMap<ContainerGetter, VecDeque<(u32, f32)>>,
+
     scope: ScopeInterface,
 
     arb: Sender<ArbiterReq>,
     subsampling: u32,
     plot_time: f32,
     pos_setpoint: CachedGetterSetter,
-    channel_selector: ChannelSelector
+    channel_selector: ChannelSelector,
+    selected_channels: HashSet<ContainerGetter>,
+
+    last_frame_time: Duration
 }
 
 impl Plotter {
@@ -41,6 +45,7 @@ impl Plotter {
         ArbiterReq::other(HostToDevice::ClearProbes, &arb);
         Plotter {
             lines: HashMap::new(),
+            lines_history: HashMap::new(),
             scope,
             arb: arb.clone(),
             subsampling: 1,
@@ -54,7 +59,9 @@ impl Plotter {
                     arb.clone()
                 ).unwrap()
             },
-            channel_selector: ChannelSelector::new()
+            channel_selector: ChannelSelector::new(),
+            selected_channels: HashSet::new(),
+            last_frame_time: Duration::ZERO
         }
     }
 
@@ -86,22 +93,40 @@ impl Plotter {
 
 impl eframe::App for Plotter {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |mut ui| {
-            let mut plot = Plot::new("lines_demo").legend(Legend::default());
+        let start = Instant::now();
 
+        let last_frame_time = self.last_frame_time;
+        egui::SidePanel::left("left panel").show(ctx, |mut ui| {
             let slider = egui::Slider::from_get_set(-100.0..=0.0, self.pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
             ui.add(slider);
 
             let selected_channels = self.channel_selector.ui(&mut ui);
             self.scope.req_set(selected_channels.clone());
+            self.selected_channels = selected_channels;
             self.recv();
+            ui.label(format!("frame processed in {:?}", last_frame_time));
+        });
 
-            plot.show(ui, move |plot_ui| {
-                for (getter, values) in &self.lines {
-                    if selected_channels.contains(getter) {
+        egui::CentralPanel::default().show(ctx, |mut ui| {
+            let mut plot = Plot::new("lines_demo").legend(Legend::default());
+
+            let lines = self.lines.clone();
+            let lines_history = self.lines_history.clone();
+
+            plot.show(ui, |plot_ui| {
+
+                let draw_lines;
+                if plot_ui.is_auto_bounds().x {
+                    draw_lines = lines;
+                    self.lines_history = self.lines.clone()
+                } else {
+                    draw_lines = lines_history;
+                }
+                for (getter, values) in draw_lines {
+                    if self.selected_channels.clone().contains(&getter) {
                         let name = format!("{}", getter);
-                        let line = Line::new(Values::from_values_iter(
-                            values.iter().map(|(id, value)| PlotValue::new(*id as f64 / 8000.0, *value as f64))
+                        let line = Line::new(PlotPoints::from_iter(
+                            values.iter().map(|(id, value)| [*id as f64 / 8000.0, *value as f64])
                         )).name(name);
                         plot_ui.line(line);
                     }
@@ -110,6 +135,8 @@ impl eframe::App for Plotter {
 
             ctx.request_repaint();
         });
+
+        self.last_frame_time = Instant::now() - start;
     }
 }
 

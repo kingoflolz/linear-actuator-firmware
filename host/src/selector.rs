@@ -1,4 +1,4 @@
-use egui::{Response, Ui, Widget};
+use crate::egui::{Response, Ui, Widget};
 use remote_obj::prelude::*;
 use common::{Container, ContainerGetter};
 use rand::Rng;
@@ -58,7 +58,7 @@ impl Widget for &mut GetterSelector {
                     }
                 }
 
-                let mut combo = egui::ComboBox::from_id_source([self.id, idx]);
+                let mut combo = crate::egui::ComboBox::from_id_source([self.id, idx]);
                 if *i != 0 {
                     combo = combo.width(1.0)
                 }

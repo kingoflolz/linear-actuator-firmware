@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use egui::{Response, Ui, Widget};
+use crate::egui::{Response, Ui, Widget};
 use remote_obj::prelude::*;
 use common::{Container, ContainerGetter, HostToDevice};
 use rand::Rng;
