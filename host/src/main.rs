@@ -1,5 +1,6 @@
 mod comms;
-mod autocomplete;
+mod selector;
+mod channel_selector;
 
 use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
 use std::time::Duration;
@@ -20,16 +21,16 @@ use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interfac
 
 use eframe::egui;
 use egui::plot::{Line, Plot, Values, Value as PlotValue, Legend};
-use crate::autocomplete::Autocomplete;
+use crate::channel_selector::ChannelSelector;
 
 struct Plotter {
     lines: HashMap<ContainerGetter, VecDeque<(usize, f32)>>,
-    probes: Vec<ContainerGetter>,
     receiver: Receiver<ScopePacket>,
     arb: Sender<ArbiterReq>,
     subsampling: u32,
     plot_time: f32,
     pos_setpoint: CachedGetterSetter,
+    channel_selector: ChannelSelector
 }
 
 impl Plotter {
@@ -37,7 +38,6 @@ impl Plotter {
         ArbiterReq::other(HostToDevice::ClearProbes, &arb);
         Plotter {
             lines: HashMap::new(),
-            probes: Vec::new(),
             receiver,
             arb: arb.clone(),
             subsampling: 1,
@@ -50,7 +50,8 @@ impl Plotter {
                     }),
                     arb.clone()
                 )
-            }
+            },
+            channel_selector: ChannelSelector::new(arb.clone())
         }
     }
 
@@ -59,15 +60,10 @@ impl Plotter {
         ArbiterReq::other(HostToDevice::ProbeInterval(subsampling), &self.arb);
     }
 
-    pub fn add_probe(&mut self, probe: ContainerGetter) {
-        self.probes.push(probe.clone());
-        ArbiterReq::other(HostToDevice::AddProbe(probe), &self.arb);
-    }
-
     pub fn insert_packet(&mut self, packet: ScopePacket) {
-        let results = packet.rehydrate(&self.probes);
+        let results = packet.rehydrate(&self.channel_selector.getters);
 
-        for (r, v) in zip(results.iter(), self.probes.iter()) {
+        for (r, v) in zip(results.iter(), self.channel_selector.getters.iter()) {
             if !self.lines.contains_key(v) {
                 self.lines.insert(v.clone(), VecDeque::new());
             }
@@ -84,11 +80,13 @@ impl Plotter {
 
 impl eframe::App for Plotter {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |mut ui| {
             let mut plot = Plot::new("lines_demo").legend(Legend::default());
 
             let slider = egui::Slider::from_get_set(-100.0..=0.0, self.pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
             ui.add(slider);
+
+            self.channel_selector.ui(&mut ui);
 
             let r = plot.show(ui, |plot_ui| {
                 for (getter, values) in &self.lines {
@@ -135,9 +133,9 @@ fn main() {
     // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.d));
     // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.q));
     // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.q_req));
-    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint));
-    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.position));
-    plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.velocity));
+    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint));
+    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.position));
+    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.velocity));
 
     // plotter.add_probe(getter!(Container.adc[1]));
     // plotter.add_probe(getter!(Container.adc[2]));

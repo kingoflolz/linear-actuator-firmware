@@ -1009,6 +1009,7 @@ dependencies = [
  "foc",
  "framed",
  "npy",
+ "rand",
  "remote-obj",
  "rusb",
  "serialport",

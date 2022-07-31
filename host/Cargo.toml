@@ -10,6 +10,7 @@ eframe = "0.18.0"
 framed = { git = "https://github.com/kingoflolz/framed-rs.git"}
 serialport = "4.2.0"
 common = { path = "../lib/common" }
+rand = "0.8.5"
 foc = { path = "../lib/foc" }
 bincode = { version = "2.0.0-beta.1"}
 npy = "0.4.0"
