@@ -229,7 +229,7 @@ impl Arbiter {
     }
 }
 
-pub fn new_interface() -> (Sender<ArbiterReq>, Receiver<ScopePacket>) {
+pub fn new_interface() -> (Sender<ArbiterReq>, Receiver<DeviceToHost>) {
     let (writer_send, reader_recv) = new_device_pair();
     let (scope_send, scope_recv) = channel();
     let (reader_recv_fwd_send, reader_recv_fwd_recv) = channel();
@@ -237,11 +237,14 @@ pub fn new_interface() -> (Sender<ArbiterReq>, Receiver<ScopePacket>) {
     spawn(move || {
         for d2h in reader_recv {
             match d2h {
-                DeviceToHost::Sample(s) => {
-                    scope_send.send(s).unwrap();
+                DeviceToHost::Sample(_) |
+                DeviceToHost::ProbeAdded |
+                DeviceToHost::ProbeRemoved |
+                DeviceToHost::ProbeCleared => {
+                    scope_send.send(d2h).unwrap();
                 }
-                other @ _ => {
-                    reader_recv_fwd_send.send(other).unwrap();
+                _ => {
+                    reader_recv_fwd_send.send(d2h).unwrap();
                 }
             }
         };
@@ -260,15 +263,14 @@ pub struct CachedGetterSetter {
 impl CachedGetterSetter {
     pub fn new(getter: ContainerGetter,
                setter: Box<dyn Fn(f32) -> ContainerSetter>,
-               arb: Sender<ArbiterReq>) -> Self {
-        let cached_value = ArbiterReq::get(getter, &arb).unwrap();
-        println!("{:?}: {}", getter, cached_value);
-        CachedGetterSetter {
+               arb: Sender<ArbiterReq>) -> Option<Self> {
+        let cached_value = ArbiterReq::get(getter, &arb).ok()?;
+        Some(CachedGetterSetter {
             getter,
             setter,
             cached_value,
             arb
-        }
+        })
     }
 
     pub fn getter_setter(&mut self) -> impl FnMut(Option<f64>) -> f64 + '_ {

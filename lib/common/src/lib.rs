@@ -107,12 +107,16 @@ impl ScopePacket {
 pub enum DeviceToHost {
     Sample(ScopePacket),
     SetterReply(Result<(), ()>),
-    GetterReply(Result<CValue, ()>)
+    GetterReply(Result<CValue, ()>),
+    ProbeAdded,
+    ProbeRemoved,
+    ProbeCleared
 }
 
-#[derive(Encode, Decode, Debug)]
+#[derive(Encode, Decode, Debug, Clone)]
 pub enum HostToDevice {
     AddProbe(CGetter),
+    RemoveProbe(u8),
     ClearProbes,
     ProbeInterval(u32),
     Setter(CSetter),

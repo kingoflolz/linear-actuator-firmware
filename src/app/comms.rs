@@ -40,9 +40,15 @@ impl<const SEND_BUF: usize, const RECV_BUF: usize> ControllerComms<SEND_BUF, REC
                     match host_command {
                         HostToDevice::AddProbe(p) => {
                             let _ = self.probes.push(p);
+                            let probe_added = DeviceToHost::ProbeAdded;
+                            let length = encode_and_frame(probe_added, grant.buf());
+                            grant.commit(length);
                         }
                         HostToDevice::ClearProbes => {
-                            self.probes.clear()
+                            self.probes.clear();
+                            let probe_cleared = DeviceToHost::ProbeCleared;
+                            let length = encode_and_frame(probe_cleared, grant.buf());
+                            grant.commit(length);
                         }
                         HostToDevice::Setter(s) => {
                             let set_result = DeviceToHost::SetterReply(x.set(s));
@@ -56,6 +62,14 @@ impl<const SEND_BUF: usize, const RECV_BUF: usize> ControllerComms<SEND_BUF, REC
                         }
                         HostToDevice::ProbeInterval(f) => {
                             self.write_every = f
+                        }
+                        HostToDevice::RemoveProbe(idx) => {
+                            if idx < self.probes.capacity() as u8 {
+                                self.probes.swap_remove(idx as usize);
+                            }
+                            let remove_done = DeviceToHost::ProbeRemoved;
+                            let length = encode_and_frame(remove_done, grant.buf());
+                            grant.commit(length);
                         }
                     }
                 }

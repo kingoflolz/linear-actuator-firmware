@@ -1,6 +1,7 @@
 mod comms;
 mod selector;
 mod channel_selector;
+mod scope_interface;
 
 use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
 use std::time::Duration;
@@ -12,20 +13,22 @@ use std::fmt::Arguments;
 use std::iter::zip;
 use std::sync::{Arc, mpsc};
 use std::sync::mpsc::{channel, Sender, Receiver, RecvTimeoutError};
-use std::thread::spawn;
+use std::thread::{Scope, spawn};
 use remote_obj::prelude::*;
 
-use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Recipient, Result, TransferType, UsbContext};
+use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Recipient, TransferType, UsbContext};
 use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter, Container, ContainerValue, ContainerSetter};
 use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interface};
 
 use eframe::egui;
 use egui::plot::{Line, Plot, Values, Value as PlotValue, Legend};
 use crate::channel_selector::ChannelSelector;
+use crate::scope_interface::ScopeInterface;
 
 struct Plotter {
-    lines: HashMap<ContainerGetter, VecDeque<(usize, f32)>>,
-    receiver: Receiver<ScopePacket>,
+    lines: HashMap<ContainerGetter, VecDeque<(u32, f32)>>,
+    scope: ScopeInterface,
+
     arb: Sender<ArbiterReq>,
     subsampling: u32,
     plot_time: f32,
@@ -34,11 +37,11 @@ struct Plotter {
 }
 
 impl Plotter {
-    pub fn new(receiver: Receiver<ScopePacket>, arb: Sender<ArbiterReq>) -> Self {
+    pub fn new(scope: ScopeInterface, arb: Sender<ArbiterReq>) -> Self {
         ArbiterReq::other(HostToDevice::ClearProbes, &arb);
         Plotter {
             lines: HashMap::new(),
-            receiver,
+            scope,
             arb: arb.clone(),
             subsampling: 1,
             plot_time: 2.0,
@@ -49,9 +52,9 @@ impl Plotter {
                         setter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint = v)
                     }),
                     arb.clone()
-                )
+                ).unwrap()
             },
-            channel_selector: ChannelSelector::new(arb.clone())
+            channel_selector: ChannelSelector::new()
         }
     }
 
@@ -60,20 +63,23 @@ impl Plotter {
         ArbiterReq::other(HostToDevice::ProbeInterval(subsampling), &self.arb);
     }
 
-    pub fn insert_packet(&mut self, packet: ScopePacket) {
-        let results = packet.rehydrate(&self.channel_selector.getters);
+    pub fn recv(&mut self) {
+        let mut last_id = None;
+        while let Ok((id, packet)) = self.scope.try_recv() {
+            last_id = Some(id);
 
-        for (r, v) in zip(results.iter(), self.channel_selector.getters.iter()) {
-            if !self.lines.contains_key(v) {
-                self.lines.insert(v.clone(), VecDeque::new());
+            for (&k, &v) in packet.iter() {
+                let line = self.lines.entry(k).or_insert(VecDeque::new());
+                line.push_back((id, v.as_float().unwrap()));
             }
-            if let Some(result) = r {
-                self.lines.get_mut(v).unwrap().push_front((
-                    packet.id as usize,
-                    result.as_float().unwrap()
-                ));
-            }
-            self.lines.get_mut(v).unwrap().truncate((self.plot_time * 8000.0 / self.subsampling as f32) as usize);
+        }
+
+        // we got some packets this frame, truncate to the given number of seconds
+        if let Some(last_id) = last_id {
+            self.lines.iter_mut().map(|(k, v) | {
+                let idx = v.partition_point(|&(id, _)| (id + (8000.0 * self.plot_time) as u32) < last_id);
+                v.drain(..idx)
+            }).for_each(drop);
         }
     }
 }
@@ -86,21 +92,21 @@ impl eframe::App for Plotter {
             let slider = egui::Slider::from_get_set(-100.0..=0.0, self.pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
             ui.add(slider);
 
-            self.channel_selector.ui(&mut ui);
+            let selected_channels = self.channel_selector.ui(&mut ui);
+            self.scope.req_set(selected_channels.clone());
+            self.recv();
 
-            let r = plot.show(ui, |plot_ui| {
+            plot.show(ui, move |plot_ui| {
                 for (getter, values) in &self.lines {
-                    let name = format!("{}", getter);
-                    let line = Line::new(Values::from_values_iter(
-                        values.iter().map(|(id, value)| PlotValue::new(*id as f64 / 8000.0, *value as f64))
-                    )).name(name);
-                    plot_ui.line(line);
+                    if selected_channels.contains(getter) {
+                        let name = format!("{}", getter);
+                        let line = Line::new(Values::from_values_iter(
+                            values.iter().map(|(id, value)| PlotValue::new(*id as f64 / 8000.0, *value as f64))
+                        )).name(name);
+                        plot_ui.line(line);
+                    }
                 }
             });
-
-            while let Ok(packet) = self.receiver.try_recv() {
-                self.insert_packet(packet);
-            }
 
             ctx.request_repaint();
         });
@@ -109,42 +115,11 @@ impl eframe::App for Plotter {
 
 fn main() {
     let (arb, scope ) = new_interface();
+    let scope_interface = ScopeInterface::new(arb.clone(), scope);
 
-    // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[1]))).unwrap();
-    // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[2]))).unwrap();
-    // cmd_s.send(HostToDevice::AddProbe(getter!(Container.adc[3]))).unwrap();
-
-    let mut plotter = Plotter::new(scope, arb);
+    let mut plotter = Plotter::new(scope_interface, arb);
     plotter.set_subsampling(16);
     plotter.plot_time = 5.0;
-
-    // plotter.add_probe(getter!(Container.encoder::Running.normalized[0]));
-    // plotter.add_probe(getter!(Container.encoder::Running.normalized[1]));
-    // plotter.add_probe(getter!(Container.encoder::Running.normalized[2]));
-    // plotter.add_probe(getter!(Container.encoder::Running.normalized[3]));
-    // plotter.add_probe(getter!(Container.update.phase_currents.u));
-    // plotter.add_probe(getter!(Container.update.phase_currents.v));
-    // plotter.add_probe(getter!(Container.update.phase_currents.w));
-    //
-    // plotter.add_probe(getter!(Container.pwm[0]));
-    // plotter.add_probe(getter!(Container.pwm[1]));
-    // plotter.add_probe(getter!(Container.pwm[2]));
-
-    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.d));
-    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.dq_currents.q));
-    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.q_req));
-    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint));
-    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.position));
-    // plotter.add_probe(getter!(Container.controller.voltage_controller::Foc.encoder_output.velocity));
-
-    // plotter.add_probe(getter!(Container.adc[1]));
-    // plotter.add_probe(getter!(Container.adc[2]));
-    // plotter.add_probe(getter!(Container.adc[3]));
-    // plotter.add_probe(getter!(Container.adc[4]));
-    // plotter.add_probe(getter!(Container.adc[5]));
-    // plotter.add_probe(getter!(Container.adc[6]));
-    // plotter.add_probe(getter!(Container.adc[7]));
-    // plotter.add_probe(getter!(Container.adc[8]));
 
     let options = eframe::NativeOptions::default();
     eframe::run_native(
