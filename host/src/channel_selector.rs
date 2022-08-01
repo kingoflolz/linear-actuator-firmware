@@ -31,6 +31,7 @@ impl ChannelSelector {
             });
         }
 
+        // go in reverse so it doesn't mess up idx of other items
         for &i in remove.iter().rev() {
             self.selectors.remove(i);
         }

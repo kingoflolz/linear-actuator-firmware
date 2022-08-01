@@ -969,7 +969,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "encoder",
- "libm 0.2.3",
+ "micromath",
  "remote-obj",
  "rtt-target",
 ]
@@ -1450,7 +1450,6 @@ dependencies = [
  "foc",
  "framed",
  "heapless",
- "libm 0.2.3",
  "micromath",
  "panic-rtt-target",
  "remote-obj",

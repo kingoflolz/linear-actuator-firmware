@@ -1,8 +1,8 @@
-use libm::sincosf;
 use crate::config::Config;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use remote_obj::*;
 use bincode::{Encode, Decode};
+use micromath::F32Ext;
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]
 #[remote(derive(Encode, Decode, Debug))]
@@ -34,7 +34,8 @@ impl OpenLoopVoltageController {
         let voltage = update.bus_voltage;
         let request_duty = config.open_loop_voltage / voltage;
 
-        let (s, c) = sincosf(position_req);
+        let s = position_req.sin();
+        let c = position_req.cos();
 
         let alpha = s * request_duty;
         let beta = c * request_duty;

@@ -1,7 +1,7 @@
-use libm::sincosf;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use bincode::{Decode, Encode};
 use remote_obj::*;
+use micromath::F32Ext;
 
 pub struct AlphaBetaCurrents {
     pub alpha: f32, // units of amps
@@ -60,7 +60,8 @@ pub struct DQCurrents {
 
 impl AlphaBetaCurrents {
     pub fn park_transform(&self, angle: f32) -> DQCurrents {
-        let (s, c) = sincosf(angle);
+        let s = angle.sin();
+        let c = angle.cos();
 
         DQCurrents {
             q: self.alpha * c - self.beta * s,
@@ -91,7 +92,8 @@ impl AlphaBetaVoltages {
 
 impl DQVoltages {
     pub fn inv_park_transform(&self, angle: f32) -> AlphaBetaVoltages {
-        let (s, c) = sincosf(angle);
+        let s = angle.sin();
+        let c = angle.cos();
 
         AlphaBetaVoltages {
             alpha: self.q * c + self.d * s,

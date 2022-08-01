@@ -145,8 +145,8 @@ fn main() {
     let scope_interface = ScopeInterface::new(arb.clone(), scope);
 
     let mut plotter = Plotter::new(scope_interface, arb);
-    plotter.set_subsampling(16);
-    plotter.plot_time = 5.0;
+    plotter.set_subsampling(1);
+    plotter.plot_time = 2.0;
 
     let options = eframe::NativeOptions::default();
     eframe::run_native(

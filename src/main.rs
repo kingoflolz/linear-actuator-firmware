@@ -4,7 +4,7 @@
 
 use panic_rtt_target as _;
 
-#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [EXTI0])]
+#[rtic::app(device = stm32f4xx_hal::pac, dispatchers = [EXTI0, EXTI1])]
 mod app {
     use dwt_systick_monotonic::DwtSystick;
     use dwt_systick_monotonic::fugit::Duration;
@@ -350,21 +350,16 @@ mod app {
         cx.local.c.run();
     }
 
-    #[task(binds = DMA2_STREAM0, local = [adc_buffer, p, adc_transfer, controller, config, pwm, encoder], priority = 5)]
-    fn dma(cx: dma::Context) {
-        let dma::Context { local } = cx;
-        let dma::LocalResources {
-            adc_buffer,
+    #[task(local = [p, controller, config, pwm, encoder], priority = 2, capacity = 1)]
+    fn control_loop(cx: control_loop::Context, buffer: [u16; 16]) {
+        let control_loop::Context { local } = cx;
+        let control_loop::LocalResources {
             p,
-            adc_transfer,
             controller,
             config,
             encoder,
             pwm
         } = local;
-        let (buffer, _) = adc_transfer
-            .next_transfer(adc_buffer.take().unwrap())
-            .unwrap();
 
         let position = encoder.update([buffer[1] as f32, buffer[2] as f32, buffer[3] as f32, buffer[4] as f32]);
 
@@ -382,7 +377,7 @@ mod app {
         pwm.set_duty(&pwm_req);
 
         let mut container = Container {
-            adc: buffer,
+            adc: &buffer,
             pwm: &pwm_req.to_array(),
             controller,
             update: &update,
@@ -390,6 +385,20 @@ mod app {
         };
 
         p.tick(&mut container);
+    }
+
+    #[task(binds = DMA2_STREAM0, local = [adc_buffer, adc_transfer], priority = 5)]
+    fn dma(cx: dma::Context) {
+        let dma::Context { local } = cx;
+        let dma::LocalResources {
+            adc_buffer,
+            adc_transfer,
+        } = local;
+        let (buffer, _) = adc_transfer
+            .next_transfer(adc_buffer.take().unwrap())
+            .unwrap();
+
+        control_loop::spawn(buffer.clone()).unwrap();
 
         *adc_buffer = Some(buffer);
 

@@ -19,7 +19,6 @@ dwt-systick-monotonic = "1.0"
 rtt-target = { version = "0.3.1", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
 bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
-libm = "0.2.0"
 foc = { path = "lib/foc" }
 common = { path = "lib/common" }
 encoder = { path = "lib/encoder" }
