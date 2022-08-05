@@ -1,5 +1,5 @@
 // use rtt_target::rprintln;
-use crate::config::Config;
+use config::Config;
 use crate::open_loop_voltage::OpenLoopVoltageController;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use encoder::normalizer::{NormalizerBuilder, Normalizer};

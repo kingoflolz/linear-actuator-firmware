@@ -8,15 +8,13 @@ use std::sync::mpsc::Sender;
 use crate::ArbiterReq;
 
 pub struct ChannelSelector {
-    selectors: Vec<GetterSelector>,
-    pub(crate) getters: Vec<ContainerGetter>,
+    pub selectors: Vec<GetterSelector>,
 }
 
 impl ChannelSelector {
     pub fn new() -> ChannelSelector {
         ChannelSelector {
             selectors: Vec::new(),
-            getters: Vec::new(),
         }
     }
 
@@ -40,6 +38,10 @@ impl ChannelSelector {
             self.selectors.push(GetterSelector::new())
         }
 
+        self.get_selectors()
+    }
+
+    pub fn get_selectors(&self) -> HashSet<ContainerGetter> {
         self.selectors.iter().filter_map(|x| x.getter).collect()
     }
 }

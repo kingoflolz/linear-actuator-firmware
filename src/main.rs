@@ -26,7 +26,7 @@ mod app {
     };
 
     use foc::state_machine::{PWMCommand, Controller};
-    use foc::config::Config;
+    use config::Config;
 
     use encoder::EncoderState;
 
@@ -146,8 +146,8 @@ mod app {
         };
 
         // leds
-        // gpiob.pb12.into_push_pull_output().set_high();
-        // gpiob.pb13.into_push_pull_output().set_high();
+        gpiob.pb12.into_push_pull_output().set_high();
+        gpiob.pb13.into_push_pull_output().set_high();
         gpiob.pb14.into_push_pull_output().set_high();
         gpiob.pb15.into_push_pull_output().set_high();
 
@@ -361,7 +361,16 @@ mod app {
             pwm
         } = local;
 
-        let position = encoder.update([buffer[1] as f32, buffer[2] as f32, buffer[3] as f32, buffer[4] as f32]);
+        let position = encoder.update([
+            buffer[1] as f32,
+            buffer[2] as f32,
+            buffer[3] as f32,
+            buffer[4] as f32,
+            buffer[5] as f32,
+            buffer[6] as f32,
+            buffer[7] as f32,
+            buffer[8] as f32,
+        ], &config);
 
         let update = to_controller_update(&buffer, position, &config);
         let mut pwm_req = controller.update(&update, &config);

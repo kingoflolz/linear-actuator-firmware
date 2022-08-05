@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["lib/foc", "host", "lib/encoder"]
+members = ["lib/foc", "host", "lib/encoder", "lib/config"]
 
 [dependencies]
 heapless = "0.7.5"
@@ -22,6 +22,7 @@ bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = 
 foc = { path = "lib/foc" }
 common = { path = "lib/common" }
 encoder = { path = "lib/encoder" }
+config = { path = "lib/config" }
 remote-obj = { path = "../remote-obj" }
 framed = { git = "https://github.com/kingoflolz/framed-rs.git", default-features = false}
 bbqueue = "0.5.1"
@@ -31,10 +32,13 @@ rustc-hash = { version = "1.0", default-features = false }
 version = "0.13.2"
 features = ["rt", "stm32f411", "otg-fs", "usb_fs"]
 
+[profile.lto]
+inherits = "release"
+lto = true
+
 [profile.release]
 debug = 2
 panic = "abort"
-lto = false
 
 [profile.dev]
 panic = "abort"

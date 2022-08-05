@@ -1,4 +1,4 @@
-use crate::config::Config;
+use config::Config;
 use crate::svm::IterativeSVM;
 use crate::calibration::EncoderCalibrationController;
 use crate::foc::FieldOrientedControl;

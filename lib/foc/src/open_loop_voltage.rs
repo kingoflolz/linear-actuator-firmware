@@ -1,4 +1,4 @@
-use crate::config::Config;
+use config::Config;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use remote_obj::*;
 use bincode::{Encode, Decode};

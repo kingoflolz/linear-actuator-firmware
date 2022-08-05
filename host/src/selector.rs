@@ -19,6 +19,14 @@ impl GetterSelector {
             id: rng.gen()
         }
     }
+
+    pub fn from_getter(getter: ContainerGetter) -> Self {
+        GetterSelector {
+            indexes: vec![],
+            getter: Some(getter),
+            id: 0
+        }
+    }
 }
 
 impl Widget for &mut GetterSelector {

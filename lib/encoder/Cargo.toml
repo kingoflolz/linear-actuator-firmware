@@ -10,6 +10,8 @@ libm = "0.2.0"
 bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
 remote-obj = { path = "../../../remote-obj" }
 biquad = "0.4.2"
+nalgebra = { version = "0.31.1", default-features = false}
+config = { path = "../config" }
 
 [dev-dependencies]
 rand = "0.8"

@@ -19,10 +19,16 @@ use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalCon
 use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter, Container, ContainerValue, ContainerSetter};
 use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interface};
 
-use eframe::egui;
+use eframe::{App, egui};
 use egui::plot::{Line, Plot, Legend, PlotPoints};
 use crate::channel_selector::ChannelSelector;
 use crate::scope_interface::ScopeInterface;
+use crate::selector::GetterSelector;
+
+use std::{thread, time};
+use std::fs::File;
+use npyz::WriterBuilder;
+use rand::seq::index::sample;
 
 struct Plotter {
     lines: HashMap<ContainerGetter, VecDeque<(u32, f32)>>,
@@ -33,7 +39,7 @@ struct Plotter {
     arb: Sender<ArbiterReq>,
     subsampling: u32,
     plot_time: f32,
-    pos_setpoint: CachedGetterSetter,
+    pos_setpoint: Option<CachedGetterSetter>,
     channel_selector: ChannelSelector,
     selected_channels: HashSet<ContainerGetter>,
 
@@ -57,7 +63,7 @@ impl Plotter {
                         setter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint = v)
                     }),
                     arb.clone()
-                ).unwrap()
+                )
             },
             channel_selector: ChannelSelector::new(),
             selected_channels: HashSet::new(),
@@ -97,8 +103,10 @@ impl eframe::App for Plotter {
 
         let last_frame_time = self.last_frame_time;
         egui::SidePanel::left("left panel").show(ctx, |mut ui| {
-            let slider = egui::Slider::from_get_set(-100.0..=0.0, self.pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
-            ui.add(slider);
+            if let Some(pos_setpoint) = self.pos_setpoint.as_mut() {
+                let slider = egui::Slider::from_get_set(-100.0..=0.0, pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
+                ui.add(slider);
+            }
 
             let selected_channels = self.channel_selector.ui(&mut ui);
             self.scope.req_set(selected_channels.clone());
@@ -140,11 +148,75 @@ impl eframe::App for Plotter {
     }
 }
 
+impl Plotter {
+    fn save_data(&mut self) {
+        self.set_subsampling(1);
+        self.plot_time = 1e3;
+
+        let samples = 200_000;
+
+        let channels = [
+            getter!(Container.adc[0]),
+            getter!(Container.adc[1]),
+            getter!(Container.adc[2]),
+            getter!(Container.adc[3]),
+            getter!(Container.adc[4]),
+            getter!(Container.adc[5]),
+            getter!(Container.adc[6]),
+            getter!(Container.adc[7]),
+            getter!(Container.adc[8]),
+        ];
+        let ten_millis = time::Duration::from_millis(10);
+
+        for c in channels {
+            self.channel_selector.selectors.push(GetterSelector::from_getter(c));
+            thread::sleep(ten_millis);
+        }
+        self.scope.req_set(self.channel_selector.get_selectors());
+
+        loop {
+            self.recv();
+
+            if let Some(v) = self.lines.get(&channels[0]) {
+                if v.len() > samples + 100 {
+                    break
+                }
+                println!("{}", v.len())
+            }
+
+            thread::sleep(ten_millis);
+        }
+
+        for c in channels {
+            println!("{:?} {}", c, self.lines[&c].len())
+        }
+
+        let mut buffer = File::create("data.npy").unwrap();
+
+        let mut writer = {
+            npyz::WriteOptions::new()
+                .default_dtype()
+                .shape(&[channels.len() as u64, samples as u64])
+                .writer(buffer)
+                .begin_nd().unwrap()
+        };
+
+        for c in channels {
+            let v = &self.lines[&c];
+            writer.extend(v.range((v.len() - samples)..).map(|(idx, value)| value)).unwrap();
+        }
+        writer.finish().unwrap();
+    }
+}
+
 fn main() {
     let (arb, scope ) = new_interface();
     let scope_interface = ScopeInterface::new(arb.clone(), scope);
 
     let mut plotter = Plotter::new(scope_interface, arb);
+
+    // plotter.save_data();
+
     plotter.set_subsampling(1);
     plotter.plot_time = 2.0;
 

@@ -11,3 +11,4 @@ rtt-target = { version = "0.3.1", features = ["cortex-m"] }
 encoder = { path = "../encoder" }
 bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
 remote-obj = { path = "../../../remote-obj" }
+config = { path = "../config" }

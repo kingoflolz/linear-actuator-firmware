@@ -83,7 +83,7 @@ mod tests {
             b.update(normal.sample(&mut rng))
         }
 
-        let n = b.get_normalizer();
+        let n = b.get_normalizer().unwrap();
 
         assert!((n.mean - 5.0).abs() < 0.1);
         assert!((n.std - 3.0).abs() < 0.1);
@@ -95,7 +95,7 @@ mod tests {
             b2.update(normed);
         }
 
-        let n = b2.get_normalizer();
+        let n = b2.get_normalizer().unwrap();
         assert!(n.mean.abs() < 0.1);
         assert!((n.std - 1.0).abs() < 0.1);
     }

@@ -16,4 +16,5 @@ bincode = { version = "2.0.0-beta.1"}
 npy = "0.4.0"
 remote-obj = { path = "../../remote-obj" }
 rusb = "0.9.1"
+npyz = "0.6.1"
 # rusb = { git = "https://github.com/kevinmehall/rusb.git", branch = "km-pipe-approach" }

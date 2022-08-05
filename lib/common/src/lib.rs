@@ -1,11 +1,11 @@
 #![no_std]
 use bincode::{Decode, Encode};
-use bincode::config::{Configuration, LittleEndian, NoLimit, SkipFixedArrayLength, Fixint, Varint};
+use bincode::config::{Configuration, Fixint, LittleEndian, NoLimit, SkipFixedArrayLength, Varint};
 use bincode::de::Decoder;
 use bincode::enc::Encoder;
 use bincode::error::{DecodeError, EncodeError};
 use foc::state_machine::ControllerUpdate;
-use foc::config::Config;
+use config::Config;
 use foc::transforms::{DQCurrents, PhaseCurrents};
 use encoder::{EncoderOutput, EncoderState};
 use remote_obj::*;

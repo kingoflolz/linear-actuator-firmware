@@ -81,6 +81,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
 
 [[package]]
+name = "approx"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "arboard"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,6 +455,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bitset-core",
+ "config",
  "encoder",
  "foc",
  "heapless",
@@ -460,6 +470,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af4780a44ab5696ea9e28294517f1fffb421a83a25af521333c838635509db9c"
 dependencies = [
  "cache-padded",
+]
+
+[[package]]
+name = "config"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "remote-obj",
+ "serde",
 ]
 
 [[package]]
@@ -891,7 +910,9 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "biquad",
+ "config",
  "libm 0.2.3",
+ "nalgebra",
  "rand",
  "rand_distr",
  "remote-obj",
@@ -968,6 +989,7 @@ name = "foc"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "config",
  "encoder",
  "micromath",
  "remote-obj",
@@ -1290,6 +1312,7 @@ dependencies = [
  "foc",
  "framed",
  "npy",
+ "npyz",
  "rand",
  "remote-obj",
  "rusb",
@@ -1443,6 +1466,7 @@ dependencies = [
  "bbqueue",
  "bincode",
  "common",
+ "config",
  "cortex-m 0.7.5",
  "cortex-m-rtic",
  "dwt-systick-monotonic",
@@ -1576,6 +1600,20 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys",
+]
+
+[[package]]
+name = "nalgebra"
+version = "0.31.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9e0a04ce089f9401aac565c740ed30c46291260f27d4911fdbaa6ca65fa3044"
+dependencies = [
+ "approx",
+ "num-complex",
+ "num-rational",
+ "num-traits",
+ "simba",
+ "typenum",
 ]
 
 [[package]]
@@ -1753,6 +1791,46 @@ checksum = "428bbb4dd63ca4318d430b61e64e9ba7809d11525605905eaa88c73b01d91ed4"
 dependencies = [
  "byteorder",
  "nom 3.2.1",
+]
+
+[[package]]
+name = "npyz"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c21f60d99a4b72f2e6a1d8be0b8814488e68d46bc890a5903fbc574cf0ff1d31"
+dependencies = [
+ "byteorder",
+ "nom 3.2.1",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ae39348c8bc5fbd7f40c727a9925f03517afd2ab27d46702108b6a7e5414c19"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
+dependencies = [
+ "autocfg",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -2370,6 +2448,18 @@ checksum = "5a9e7e0f2bfae24d8a5b5a66c5b257a83c7412304311512a0c054cd5e619da11"
 dependencies = [
  "lazy_static",
  "libc",
+]
+
+[[package]]
+name = "simba"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c48e45e5961033db030b56ad67aef22e9c908c493a6e8348c0a0f6b93433cd77"
+dependencies = [
+ "approx",
+ "num-complex",
+ "num-traits",
+ "paste",
 ]
 
 [[package]]

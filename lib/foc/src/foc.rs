@@ -1,5 +1,5 @@
 use crate::calibration::EncoderCalibration;
-use crate::config::Config;
+use config::Config;
 use crate::pid::{DQCurrentController, PController, PIController};
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use crate::transforms::{DQCurrents, DQVoltages};

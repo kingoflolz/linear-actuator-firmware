@@ -1,4 +1,4 @@
-use crate::config::Config;
+use config::Config;
 use crate::transforms::{DQCurrents, DQVoltages};
 use remote_obj::*;
 use bincode::{Encode, Decode};

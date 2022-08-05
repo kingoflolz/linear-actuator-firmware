@@ -17,7 +17,9 @@ pub struct ScopeInterface {
 
     /// this contains messages which have been sent to the device already, but have not been applied
     /// applied to synced_probes yet (as we have not received confirmation yet)
-    pending: VecDeque<HostToDevice>
+    pending: VecDeque<HostToDevice>,
+
+    last_id: Option<u32>
 }
 
 impl ScopeInterface {
@@ -41,7 +43,8 @@ impl ScopeInterface {
             arb,
             current_requests: HashSet::new(),
             synced_probes: Vec::new(),
-            pending: VecDeque::from([HostToDevice::ClearProbes])
+            pending: VecDeque::from([HostToDevice::ClearProbes]),
+            last_id: None
         }
     }
 
@@ -77,6 +80,11 @@ impl ScopeInterface {
                 for (r, g) in zip(results.iter(), &self.synced_probes) {
                     if let Some(result) = r {
                         ret.insert(*g, *result);
+                    }
+                }
+                if let Some(last_id) = self.last_id {
+                    if last_id.wrapping_add(1) != packet.id {
+                        println!("last {} current {}", last_id, packet.id);
                     }
                 }
                 return Ok((packet.id, ret))
