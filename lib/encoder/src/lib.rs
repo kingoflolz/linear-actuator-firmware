@@ -111,10 +111,10 @@ impl Encoder {
             self.compensated[i] = output[i]
         }
 
-        let angle1 = libm::atan2f(output[0] - output[1], output[2] - output[3]);
-        let angle2 = libm::atan2f(output[1], output[3]);
-        let angle3 = libm::atan2f(output[2], output[1]);
-        let angle4 = libm::atan2f(output[3], output[0]);
+        let angle1 = libm::atan2f(self.normalized[0] - self.normalized[1], self.normalized[2] - self.normalized[3]);
+        let angle2 = libm::atan2f(self.normalized[1], self.normalized[3]);
+        let angle3 = libm::atan2f(self.normalized[4], self.normalized[5]);
+        let angle4 = libm::atan2f(self.normalized[6], self.normalized[7]);
 
         let unwrap1 = self.unwraps[0].unwrap(angle1);
         let unwrap2 = self.unwraps[1].unwrap(angle2);

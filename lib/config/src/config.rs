@@ -41,7 +41,7 @@ impl Config {
             encoder_len_per_cycle: 2.34375,
             calibration_length: 100.0,
             calibration_speed: 0.1,
-            open_loop_voltage: 0.75,
+            open_loop_voltage: 0.5,
             uvlo: 10.0,
             switching_frequency: 200e3,
             switching_clock_frequency: 100e6,

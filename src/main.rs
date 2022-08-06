@@ -164,7 +164,7 @@ mod app {
             )
             .split();
 
-        ch_u.set_duty(10);
+        ch_u.set_duty(0);
         ch_v.set_duty(0);
         ch_w.set_duty(0);
 
@@ -228,89 +228,92 @@ mod app {
         adc.configure_channel(
             &gpioa.pa5.into_analog(),
             Sequence::from(0),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         // encoder
         adc.configure_channel(
             &gpioa.pa6.into_analog(),
             Sequence::from(1),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
             &gpioa.pa4.into_analog(),
             Sequence::from(2),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
             &gpioa.pa3.into_analog(),
             Sequence::from(3),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
             &gpioc.pc2.into_analog(),
             Sequence::from(4),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
+        let pa1 = gpioa.pa2.into_analog();
+        let pc3 = gpioa.pa0.into_analog();
+
         adc.configure_channel(
-            &gpioa.pa2.into_analog(),
+            &pa1,
             Sequence::from(5),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
-            &gpioa.pa0.into_analog(),
+            &pc3,
             Sequence::from(6),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
-            &gpioc.pc3.into_analog(),
+            &pc3,
             Sequence::from(7),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
-            &gpioa.pa1.into_analog(),
+            &pa1,
             Sequence::from(8),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         // iref
         adc.configure_channel(
             &gpioa.pa7.into_analog(),
             Sequence::from(9),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         // current u, v, w
         adc.configure_channel(
             &gpiob.pb1.into_analog(),
             Sequence::from(10),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
             &gpiob.pb0.into_analog(),
             Sequence::from(11),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         adc.configure_channel(
             &gpioc.pc5.into_analog(),
             Sequence::from(12),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
 
         // vbus
         adc.configure_channel(
             &gpioc.pc0.into_analog(),
             Sequence::from(13),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         // motor temp
         adc.configure_channel(
             &gpioc.pc1.into_analog(),
             Sequence::from(14),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
         // drive temp
         adc.configure_channel(
             &gpioc.pc4.into_analog(),
             Sequence::from(15),
-            SampleTime::Cycles_3,
+            SampleTime::Cycles_28,
         );
 
         let mut adc_transfer =

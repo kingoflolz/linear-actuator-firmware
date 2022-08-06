@@ -160,7 +160,7 @@ impl EncoderCalibrationController {
             }
         }
 
-        let mut v_out = self.open_loop.process_velocity(0.001 * dir, update, config);
+        let mut v_out = self.open_loop.process_velocity(0.0005 * dir, update, config);
         if dir == 0.0 {
             v_out.driver_enable = false;
         }

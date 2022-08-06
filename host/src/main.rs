@@ -38,12 +38,13 @@ struct Plotter {
 
     arb: Sender<ArbiterReq>,
     subsampling: u32,
-    plot_time: f32,
+    plot_time: f64,
     pos_setpoint: Option<CachedGetterSetter>,
     channel_selector: ChannelSelector,
     selected_channels: HashSet<ContainerGetter>,
 
-    last_frame_time: Duration
+    last_frame_time: Duration,
+    last_frame_auto_bounds: bool
 }
 
 impl Plotter {
@@ -65,9 +66,10 @@ impl Plotter {
                     arb.clone()
                 )
             },
-            channel_selector: ChannelSelector::new(),
+            channel_selector,
             selected_channels: HashSet::new(),
-            last_frame_time: Duration::ZERO
+            last_frame_time: Duration::ZERO,
+            last_frame_auto_bounds: false
         }
     }
 
@@ -103,6 +105,8 @@ impl eframe::App for Plotter {
 
         let last_frame_time = self.last_frame_time;
         egui::SidePanel::left("left panel").show(ctx, |mut ui| {
+            ui.add(egui::Slider::new(&mut self.plot_time, 0.0..=60.0).text("max scope time"));
+
             if let Some(pos_setpoint) = self.pos_setpoint.as_mut() {
                 let slider = egui::Slider::from_get_set(-100.0..=0.0, pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
                 ui.add(slider);
@@ -119,17 +123,23 @@ impl eframe::App for Plotter {
             let mut plot = Plot::new("lines_demo").legend(Legend::default());
 
             let lines = self.lines.clone();
-            let lines_history = self.lines_history.clone();
 
             plot.show(ui, |plot_ui| {
 
-                let draw_lines;
-                if plot_ui.is_auto_bounds().x {
-                    draw_lines = lines;
+                let auto_bounds = plot_ui.is_auto_bounds().x;
+                if self.last_frame_auto_bounds && !auto_bounds {
                     self.lines_history = self.lines.clone()
+                }
+                let lines_history = self.lines_history.clone();
+
+                let draw_lines;
+                if auto_bounds {
+                    draw_lines = lines;
                 } else {
                     draw_lines = lines_history;
                 }
+
+                self.last_frame_auto_bounds = plot_ui.is_auto_bounds().x;
                 for (getter, values) in draw_lines {
                     if self.selected_channels.clone().contains(&getter) {
                         let name = format!("{}", getter);

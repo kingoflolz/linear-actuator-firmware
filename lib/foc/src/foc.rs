@@ -87,8 +87,10 @@ impl FieldOrientedControl {
         self.dq_currents = dq_currents;
         self.q_req = q;
 
-        voltage_request
+        let mut r = voltage_request
             .inv_park_transform(angle)
-            .to_voltage_controller_output(update)
+            .to_voltage_controller_output(update);
+        r.driver_enable = false;
+        r
     }
 }
