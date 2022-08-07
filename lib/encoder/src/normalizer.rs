@@ -6,8 +6,8 @@ use remote_obj::*;
 pub struct NormalizerBuilder {
     n: u32,
     k: f32,
-    ex: f32,
     ex2: f32,
+    ex: f32,
 }
 
 impl NormalizerBuilder {

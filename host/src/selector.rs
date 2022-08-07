@@ -21,10 +21,41 @@ impl GetterSelector {
     }
 
     pub fn from_getter(getter: ContainerGetter) -> Self {
+        let mut rng = rand::thread_rng();
+        let getter_string = getter.to_string();
+        let mut new_getter_string = String::new();
+
+        let mut indexes = Vec::new();
+
+        while getter_string != new_getter_string {
+            let next_string = &getter_string[new_getter_string.len()..];
+            let fields = ContainerGetter::get_fields(&new_getter_string).unwrap();
+
+            match fields {
+                FieldsType::Arr(max_len) => {
+                    assert!(next_string.starts_with('['));
+                    let r_bracket = next_string.find(']').unwrap();
+                    let idx = next_string[1..r_bracket].parse::<usize>().ok().unwrap();
+
+                    indexes.push(idx + 1);
+                    new_getter_string.push_str(&format!("[{}]", idx));
+                }
+                FieldsType::Fields(fields) => {
+                    let idx = fields.iter().position(|&x| next_string.starts_with(&x)).unwrap();
+
+                    indexes.push(idx + 1);
+                    new_getter_string.push_str(&fields[idx]);
+                }
+                _ => {
+                    break
+                }
+            }
+        }
+
         GetterSelector {
-            indexes: vec![],
+            indexes,
             getter: Some(getter),
-            id: 0
+            id: rng.gen()
         }
     }
 }

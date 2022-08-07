@@ -2,41 +2,40 @@ mod comms;
 mod selector;
 mod channel_selector;
 mod scope_interface;
+mod variable_getter;
 
-use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
 use std::time::{Duration, Instant};
 
-use core::hash::Hasher;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt::Arguments;
-use std::iter::zip;
-use std::sync::{Arc, mpsc};
-use std::sync::mpsc::{channel, Sender, Receiver, RecvTimeoutError};
-use std::thread::{Scope, spawn};
+use std::sync::mpsc::Sender;
 use remote_obj::prelude::*;
 
-use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, Recipient, TransferType, UsbContext};
-use common::{BINCODE_CFG, DeviceToHost, HostToDevice, ScopePacket, ContainerGetter, Container, ContainerValue, ContainerSetter};
-use crate::comms::{ArbiterReq, CachedGetterSetter, new_device_pair, new_interface};
+use common::{HostToDevice, ContainerGetter, ContainerSetter, Container};
+use crate::comms::{ArbiterReq, CachedGetterSetter, new_interface};
 
-use eframe::{App, egui};
+use eframe::egui;
+use crate::egui::{CollapsingHeader, Ui};
+
 use egui::plot::{Line, Plot, Legend, PlotPoints};
 use crate::channel_selector::ChannelSelector;
 use crate::scope_interface::ScopeInterface;
 use crate::selector::GetterSelector;
+use crate::variable_getter::VariableGetter;
 
 use std::{thread, time};
 use std::fs::File;
 use npyz::WriterBuilder;
-use rand::seq::index::sample;
 
-struct Plotter {
+struct GUI {
     lines: HashMap<ContainerGetter, VecDeque<(u32, f32)>>,
     lines_history: HashMap<ContainerGetter, VecDeque<(u32, f32)>>,
 
     scope: ScopeInterface,
 
     arb: Sender<ArbiterReq>,
+
+    variable_getter: VariableGetter,
+
     subsampling: u32,
     plot_time: f64,
     pos_setpoint: Option<CachedGetterSetter>,
@@ -47,14 +46,15 @@ struct Plotter {
     last_frame_auto_bounds: bool
 }
 
-impl Plotter {
+impl GUI {
     pub fn new(scope: ScopeInterface, arb: Sender<ArbiterReq>) -> Self {
         ArbiterReq::other(HostToDevice::ClearProbes, &arb);
-        Plotter {
+        GUI {
             lines: HashMap::new(),
             lines_history: HashMap::new(),
             scope,
             arb: arb.clone(),
+            variable_getter: VariableGetter::new(arb.clone()),
             subsampling: 1,
             plot_time: 2.0,
             pos_setpoint: {
@@ -66,7 +66,7 @@ impl Plotter {
                     arb.clone()
                 )
             },
-            channel_selector,
+            channel_selector: ChannelSelector::new(),
             selected_channels: HashSet::new(),
             last_frame_time: Duration::ZERO,
             last_frame_auto_bounds: false
@@ -91,7 +91,7 @@ impl Plotter {
 
         // we got some packets this frame, truncate to the given number of seconds
         if let Some(last_id) = last_id {
-            self.lines.iter_mut().map(|(k, v) | {
+            self.lines.iter_mut().map(|(_, v) | {
                 let idx = v.partition_point(|&(id, _)| (id + (8000.0 * self.plot_time) as u32) < last_id);
                 v.drain(..idx)
             }).for_each(drop);
@@ -99,7 +99,7 @@ impl Plotter {
     }
 }
 
-impl eframe::App for Plotter {
+impl eframe::App for GUI {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let start = Instant::now();
 
@@ -119,8 +119,76 @@ impl eframe::App for Plotter {
             ui.label(format!("frame processed in {:?}", last_frame_time));
         });
 
-        egui::CentralPanel::default().show(ctx, |mut ui| {
-            let mut plot = Plot::new("lines_demo").legend(Legend::default());
+        fn draw_panel(ui: &mut Ui, getter_str: &str, new_section: &str, scope_selectors: &mut Vec<GetterSelector>) {
+            let fields = ContainerGetter::get_fields(&getter_str);
+
+            match fields {
+                Some(FieldsType::Arr(max_len)) => {
+                    CollapsingHeader::new(new_section).default_open(false).show(ui, |ui| {
+                        (0..max_len).into_iter().map(|x| {
+                            format!("[{}]", x)
+                        }).for_each(|x| {
+                            draw_panel(ui, &format!("{}{}", getter_str, x), &x, scope_selectors);
+                        });
+                    });
+                }
+                Some(FieldsType::Fields(fields)) => {
+                    let mut draw_fields = |mut ui: &mut Ui| {
+                        fields.into_iter().filter(|&x| {
+                            *x != "VARIANT"
+                        }).map(|x| {
+                            x.to_string()
+                        }).for_each(|x| {
+                            draw_panel(&mut ui, &format!("{}{}", getter_str, x), &x, scope_selectors);
+                        });
+                    };
+
+                    if new_section == "" {
+                        draw_fields(ui);
+                    } else {
+                        CollapsingHeader::new(new_section).default_open(true).show(ui, |ui| {
+                            draw_fields(ui);
+                        });
+                    }
+                }
+                Some(FieldsType::Terminal) => {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{}", new_section));
+                        ui.add(egui::DragValue::new(&mut 1E-9)
+                            .max_decimals(6)
+                            .speed(0.0)
+                            .clamp_range(f64::NEG_INFINITY..=f64::INFINITY));
+                        let idx = scope_selectors.iter().position(|x| if let Some(g) = x.getter {
+                            g.to_string() == getter_str
+                        } else {
+                            false
+                        });
+
+                        if ui.button(if idx.is_none() {"📈"} else {"📉"}).clicked() {
+                            if let Some(idx) = idx {
+                                scope_selectors.remove(idx);
+                            } else {
+                                scope_selectors.push(GetterSelector::from_getter(
+                                    Container::dynamic_getter(&getter_str).unwrap()
+                                ))
+                            }
+                        }
+                    });
+                }
+                _ => {
+                    ui.label(format!("failed to create getter!"));
+                }
+            }
+        }
+
+        egui::SidePanel::right("right panel").show(ctx, |mut ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                draw_panel(ui, "", "", &mut self.channel_selector.selectors);
+            });
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let plot = Plot::new("lines_demo").legend(Legend::default());
 
             let lines = self.lines.clone();
 
@@ -158,7 +226,7 @@ impl eframe::App for Plotter {
     }
 }
 
-impl Plotter {
+impl GUI {
     fn save_data(&mut self) {
         self.set_subsampling(1);
         self.plot_time = 1e3;
@@ -201,7 +269,7 @@ impl Plotter {
             println!("{:?} {}", c, self.lines[&c].len())
         }
 
-        let mut buffer = File::create("data.npy").unwrap();
+        let buffer = File::create("data.npy").unwrap();
 
         let mut writer = {
             npyz::WriteOptions::new()
@@ -213,7 +281,7 @@ impl Plotter {
 
         for c in channels {
             let v = &self.lines[&c];
-            writer.extend(v.range((v.len() - samples)..).map(|(idx, value)| value)).unwrap();
+            writer.extend(v.range((v.len() - samples)..).map(|(_, value)| value)).unwrap();
         }
         writer.finish().unwrap();
     }
@@ -223,8 +291,7 @@ fn main() {
     let (arb, scope ) = new_interface();
     let scope_interface = ScopeInterface::new(arb.clone(), scope);
 
-    let mut plotter = Plotter::new(scope_interface, arb);
-
+    let mut plotter = GUI::new(scope_interface, arb);
     // plotter.save_data();
 
     plotter.set_subsampling(1);

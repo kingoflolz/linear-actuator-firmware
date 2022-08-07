@@ -2,7 +2,7 @@ use crate::calibration::EncoderCalibration;
 use config::Config;
 use crate::pid::{DQCurrentController, PController, PIController};
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
-use crate::transforms::{DQCurrents, DQVoltages};
+use crate::transforms::DQCurrents;
 use remote_obj::*;
 use bincode::{Encode, Decode};
 use encoder::EncoderOutput;
@@ -60,7 +60,7 @@ impl FieldOrientedControl {
 
     pub fn update(&mut self, update: &ControllerUpdate, config: &Config) -> VoltageControllerOutput {
         // encoder output is in terms of mm
-        let mut encoder_output = update.position.as_ref().unwrap();
+        let encoder_output = update.position.as_ref().unwrap();
         self.encoder_output = encoder_output.clone();
         let angle = self.cal.to_angle(self.encoder_output.position, config);
 
@@ -87,10 +87,8 @@ impl FieldOrientedControl {
         self.dq_currents = dq_currents;
         self.q_req = q;
 
-        let mut r = voltage_request
+        voltage_request
             .inv_park_transform(angle)
-            .to_voltage_controller_output(update);
-        r.driver_enable = false;
-        r
+            .to_voltage_controller_output(update)
     }
 }

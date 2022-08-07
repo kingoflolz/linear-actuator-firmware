@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::zip;
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::Duration;
-use common::{Container, DeviceToHost, HostToDevice};
+use common::{DeviceToHost, HostToDevice};
 use crate::ArbiterReq;
 use common::{ContainerGetter, ContainerValue};
 

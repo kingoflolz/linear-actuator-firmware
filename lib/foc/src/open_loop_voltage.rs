@@ -2,6 +2,7 @@ use config::Config;
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use remote_obj::*;
 use bincode::{Encode, Decode};
+#[allow(unused_imports)]
 use micromath::F32Ext;
 
 #[derive(Debug, RemoteGetter, RemoteSetter)]

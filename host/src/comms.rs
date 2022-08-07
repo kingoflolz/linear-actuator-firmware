@@ -1,13 +1,12 @@
-use std::io::{BufReader, BufWriter, IoSlice, Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::time::Duration;
 
-use core::hash::Hasher;
-use std::fmt::Arguments;
 use std::sync::{Arc, mpsc};
-use std::sync::mpsc::{channel, Sender, Receiver, RecvTimeoutError};
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::spawn;
+use eventuals::Eventual;
 
-use rusb::{Context, Device, DeviceDescriptor, DeviceHandle, Direction, GlobalContext, open_device_with_vid_pid, TransferType, UsbContext};
+use rusb::{DeviceHandle, GlobalContext, open_device_with_vid_pid};
 use common::*;
 use remote_obj::prelude::*;
 
@@ -67,7 +66,6 @@ impl DeviceWriter {
             fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
                 let timeout = Duration::from_secs(1);
                 let r = self.0.write_bulk(1, &buf, timeout).map_err(|_| std::io::ErrorKind::Other.into());
-                println!("write done");
                 r
             }
 
@@ -111,7 +109,7 @@ pub fn new_device_pair() -> (Sender<HostToDevice>, Receiver<DeviceToHost>) {
     let mut device_handle = open_device_with_vid_pid(vid, pid).expect("device not found");
     device_handle.reset().unwrap();
     // device_handle.claim_interface(1).unwrap();
-    let has_kernel_driver = match device_handle.kernel_driver_active(1) {
+    match device_handle.kernel_driver_active(1) {
         Ok(true) => {
             device_handle.detach_kernel_driver(1).ok();
             true
@@ -284,5 +282,43 @@ impl CachedGetterSetter {
             };
             self.cached_value as f64
         }
+    }
+}
+
+
+pub struct GetterSetter {
+    getter: ContainerGetter,
+    setter: Box<dyn Fn(f32) -> ContainerSetter>,
+    value: Eventual<ContainerValue>,
+    arb: Sender<ArbiterReq>
+}
+
+
+impl GetterSetter {
+    pub fn new(getter: ContainerGetter,
+               setter: Box<dyn Fn(f32) -> ContainerSetter>,
+               value: Eventual<ContainerValue>,
+               arb: Sender<ArbiterReq>) -> Option<Self> {
+        Some(GetterSetter {
+            getter,
+            setter,
+            value,
+            arb
+        })
+    }
+
+    pub fn getter_setter(&mut self) -> Option<impl FnMut(Option<f64>) -> f64 + '_> {
+        let value = self.value.value_immediate()?;
+
+        Some(move |x| {
+            if let Some(x) = x {
+                let setter = (self.setter)(x as f32);
+                ArbiterReq::set_async(
+                    setter,
+                    &self.arb
+                );
+            };
+            value.as_float().unwrap() as f64
+        })
     }
 }

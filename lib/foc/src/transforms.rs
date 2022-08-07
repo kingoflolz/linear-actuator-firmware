@@ -1,6 +1,7 @@
 use crate::state_machine::{ControllerUpdate, VoltageControllerOutput};
 use bincode::{Decode, Encode};
 use remote_obj::*;
+#[allow(unused_imports)]
 use micromath::F32Ext;
 
 pub struct AlphaBetaCurrents {
@@ -84,8 +85,8 @@ impl AlphaBetaVoltages {
     pub fn to_voltage_controller_output(&self, update: &ControllerUpdate) -> VoltageControllerOutput {
         VoltageControllerOutput {
             driver_enable: true,
-            alpha: self.alpha / 15.0,
-            beta: self.beta / 15.0,
+            alpha: self.alpha / update.bus_voltage,
+            beta: self.beta / update.bus_voltage,
         }
     }
 }

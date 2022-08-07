@@ -146,8 +146,8 @@ mod app {
         };
 
         // leds
-        gpiob.pb12.into_push_pull_output().set_high();
-        gpiob.pb13.into_push_pull_output().set_high();
+        // gpiob.pb12.into_push_pull_output().set_high();
+        // gpiob.pb13.into_push_pull_output().set_high();
         gpiob.pb14.into_push_pull_output().set_high();
         gpiob.pb15.into_push_pull_output().set_high();
 
@@ -228,7 +228,7 @@ mod app {
         adc.configure_channel(
             &gpioa.pa5.into_analog(),
             Sequence::from(0),
-            SampleTime::Cycles_28,
+            SampleTime::Cycles_480,
         );
         // encoder
         adc.configure_channel(
@@ -251,8 +251,8 @@ mod app {
             Sequence::from(4),
             SampleTime::Cycles_28,
         );
-        let pa1 = gpioa.pa2.into_analog();
-        let pc3 = gpioa.pa0.into_analog();
+        let pa1 = gpioa.pa0.into_analog();
+        let pc3 = gpioa.pa2.into_analog();
 
         adc.configure_channel(
             &pa1,
@@ -265,12 +265,12 @@ mod app {
             SampleTime::Cycles_28,
         );
         adc.configure_channel(
-            &pc3,
+            &pa1,
             Sequence::from(7),
             SampleTime::Cycles_28,
         );
         adc.configure_channel(
-            &pa1,
+            &pc3,
             Sequence::from(8),
             SampleTime::Cycles_28,
         );
@@ -414,6 +414,6 @@ mod app {
 
         *adc_buffer = Some(buffer);
 
-        rprintln!("l");
+        // rprintln!("l");
     }
 }

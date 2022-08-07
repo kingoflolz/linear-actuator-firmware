@@ -1,11 +1,7 @@
 use std::collections::HashSet;
-use crate::egui::{Response, Ui, Widget};
-use remote_obj::prelude::*;
-use common::{Container, ContainerGetter, HostToDevice};
-use rand::Rng;
+use crate::egui::Ui;
+use common::ContainerGetter;
 use crate::selector::GetterSelector;
-use std::sync::mpsc::Sender;
-use crate::ArbiterReq;
 
 pub struct ChannelSelector {
     pub selectors: Vec<GetterSelector>,
@@ -20,7 +16,7 @@ impl ChannelSelector {
 
     pub fn ui(&mut self, ui: &mut Ui) -> HashSet<ContainerGetter> {
         let mut remove = Vec::new();
-        for (idx, mut i) in self.selectors.iter_mut().enumerate() {
+        for (idx, i) in self.selectors.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.add(i);
                 if ui.button("x").clicked() {

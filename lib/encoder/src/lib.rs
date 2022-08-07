@@ -5,7 +5,7 @@
 extern crate std;
 
 use config::Config;
-use nalgebra::{base, RowSVector, SMatrix, SVector};
+use nalgebra::{RowSVector, SMatrix};
 use bincode::{Decode, Encode};
 
 pub mod normalizer;
@@ -112,7 +112,7 @@ impl Encoder {
         }
 
         let angle1 = libm::atan2f(self.normalized[0] - self.normalized[1], self.normalized[2] - self.normalized[3]);
-        let angle2 = libm::atan2f(self.normalized[1], self.normalized[3]);
+        let angle2 = libm::atan2f(self.normalized[3], self.normalized[0]);
         let angle3 = libm::atan2f(self.normalized[4], self.normalized[5]);
         let angle4 = libm::atan2f(self.normalized[6], self.normalized[7]);
 
@@ -126,7 +126,7 @@ impl Encoder {
         self.unwrapped[2] = unwrap3;
         self.unwrapped[3] = unwrap4;
 
-        self.position = unwrap1;
+        self.position = unwrap2;
 
         self.filtered_position = self.vel_filter.run(self.position);
 
@@ -139,7 +139,7 @@ impl Encoder {
         self.last_position = Some(self.filtered_position);
 
         EncoderOutput{
-            position: unwrap1,
+            position: self.position,
             filtered_position: self.filtered_position,
             velocity: self.velocity
         }

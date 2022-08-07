@@ -2,7 +2,7 @@ use config::Config;
 use crate::svm::IterativeSVM;
 use crate::calibration::EncoderCalibrationController;
 use crate::foc::FieldOrientedControl;
-use crate::transforms::{DQCurrents, PhaseCurrents};
+use crate::transforms::PhaseCurrents;
 use remote_obj::*;
 use bincode::{Encode, Decode};
 use encoder::EncoderOutput;

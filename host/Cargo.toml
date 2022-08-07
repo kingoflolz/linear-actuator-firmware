@@ -17,4 +17,5 @@ npy = "0.4.0"
 remote-obj = { path = "../../remote-obj" }
 rusb = "0.9.1"
 npyz = "0.6.1"
+eventuals = { git = "https://github.com/kingoflolz/eventuals.git", branch="partialeq" }
 # rusb = { git = "https://github.com/kevinmehall/rusb.git", branch = "km-pipe-approach" }
