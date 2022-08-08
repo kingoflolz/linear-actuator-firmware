@@ -1,7 +1,7 @@
 use remote_obj::*;
 use bincode::{Encode, Decode};
 
-#[derive(RemoteSetter, RemoteGetter)]
+#[derive(RemoteSetter, RemoteGetter, Debug)]
 #[remote(derive(Encode, Decode, Debug))]
 pub struct Config {
     // setup constants
@@ -49,10 +49,10 @@ impl Config {
             control_frequency: 8e3,
 
             current_controller_k_p: 0.22e-4,
-            current_controller_k_i: 100.0 * 60e-3 / 8e3,
-            vel_controller_k_p: 1.0,
-            vel_controller_k_i: 1.0 / 8e3,
-            pos_controller_k_p: 1.0,
+            current_controller_k_i: 1000.0 * 60e-3 / 8e3,
+            vel_controller_k_p: 0.125,
+            vel_controller_k_i: 2.0 / 8e3,
+            pos_controller_k_p: 15.0,
 
             curr_limit: 15.0,
             comp_matrix: [

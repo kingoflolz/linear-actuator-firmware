@@ -19,7 +19,7 @@ impl ChannelSelector {
         for (idx, i) in self.selectors.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.add(i);
-                if ui.button("x").clicked() {
+                if ui.button("X").clicked() {
                     remove.push(idx)
                 };
             });

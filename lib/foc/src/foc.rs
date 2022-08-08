@@ -21,7 +21,7 @@ impl PosController {
     fn update(&mut self, encoder: &EncoderOutput, config: &Config) -> f32 {
         self.vel_controller.k_i = config.vel_controller_k_i;
         self.vel_controller.p_controller.k_p = config.vel_controller_k_p;
-        self.pos_controller.k_p = config.vel_controller_k_p;
+        self.pos_controller.k_p = config.pos_controller_k_p;
 
         let velocity_setpoint = self.pos_controller.update(self.pos_setpoint - encoder.filtered_position);
         self.vel_setpoint = velocity_setpoint;

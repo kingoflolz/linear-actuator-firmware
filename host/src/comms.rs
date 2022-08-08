@@ -298,13 +298,13 @@ impl GetterSetter {
     pub fn new(getter: ContainerGetter,
                setter: Box<dyn Fn(f32) -> ContainerSetter>,
                value: Eventual<ContainerValue>,
-               arb: Sender<ArbiterReq>) -> Option<Self> {
-        Some(GetterSetter {
+               arb: Sender<ArbiterReq>) -> Self {
+        GetterSetter {
             getter,
             setter,
             value,
             arb
-        })
+        }
     }
 
     pub fn getter_setter(&mut self) -> Option<impl FnMut(Option<f64>) -> f64 + '_> {

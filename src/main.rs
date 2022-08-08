@@ -394,6 +394,7 @@ mod app {
             controller,
             update: &update,
             encoder,
+            config,
         };
 
         p.tick(&mut container);

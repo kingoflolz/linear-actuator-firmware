@@ -135,6 +135,7 @@ pub struct Container<'a> {
     pub update: &'a ControllerUpdate,
     #[remote(read_only)]
     pub encoder: &'a EncoderState,
+    pub config: &'a mut Config,
 }
 
 type CGetter = <Container<'static> as RemoteGet>::GetterType;

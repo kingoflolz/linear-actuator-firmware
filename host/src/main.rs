@@ -11,7 +11,7 @@ use std::sync::mpsc::Sender;
 use remote_obj::prelude::*;
 
 use common::{HostToDevice, ContainerGetter, ContainerSetter, Container};
-use crate::comms::{ArbiterReq, CachedGetterSetter, new_interface};
+use crate::comms::{ArbiterReq, GetterSetter, new_interface};
 
 use eframe::egui;
 use crate::egui::{CollapsingHeader, Ui};
@@ -38,7 +38,7 @@ struct GUI {
 
     subsampling: u32,
     plot_time: f64,
-    pos_setpoint: Option<CachedGetterSetter>,
+    pos_setpoint: GetterSetter,
     channel_selector: ChannelSelector,
     selected_channels: HashSet<ContainerGetter>,
 
@@ -49,23 +49,16 @@ struct GUI {
 impl GUI {
     pub fn new(scope: ScopeInterface, arb: Sender<ArbiterReq>) -> Self {
         ArbiterReq::other(HostToDevice::ClearProbes, &arb);
+        let mut variable_getter = VariableGetter::new(arb.clone());
         GUI {
             lines: HashMap::new(),
             lines_history: HashMap::new(),
             scope,
             arb: arb.clone(),
-            variable_getter: VariableGetter::new(arb.clone()),
             subsampling: 1,
             plot_time: 2.0,
-            pos_setpoint: {
-                CachedGetterSetter::new(
-                    getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint),
-                    Box::new(|v| {
-                        setter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint = v)
-                    }),
-                    arb.clone()
-                )
-            },
+            pos_setpoint: variable_getter.get_getter_setter(getter!(Container.controller.voltage_controller::Foc.pos_controller.pos_setpoint)),
+            variable_getter,
             channel_selector: ChannelSelector::new(),
             selected_channels: HashSet::new(),
             last_frame_time: Duration::ZERO,
@@ -107,8 +100,8 @@ impl eframe::App for GUI {
         egui::SidePanel::left("left panel").show(ctx, |mut ui| {
             ui.add(egui::Slider::new(&mut self.plot_time, 0.0..=60.0).text("max scope time"));
 
-            if let Some(pos_setpoint) = self.pos_setpoint.as_mut() {
-                let slider = egui::Slider::from_get_set(-100.0..=0.0, pos_setpoint.getter_setter()).text("Pos setpoint").smart_aim(false);
+            if let Some(pos_setpoint) = self.pos_setpoint.getter_setter() {
+                let slider = egui::Slider::from_get_set(-100.0..=0.0, pos_setpoint).text("Pos setpoint").smart_aim(false);
                 ui.add(slider);
             }
 
@@ -119,7 +112,7 @@ impl eframe::App for GUI {
             ui.label(format!("frame processed in {:?}", last_frame_time));
         });
 
-        fn draw_panel(ui: &mut Ui, getter_str: &str, new_section: &str, scope_selectors: &mut Vec<GetterSelector>) {
+        fn draw_panel(ui: &mut Ui, getter_str: &str, new_section: &str, scope_selectors: &mut Vec<GetterSelector>, variable_getter: &mut VariableGetter) {
             let fields = ContainerGetter::get_fields(&getter_str);
 
             match fields {
@@ -128,7 +121,7 @@ impl eframe::App for GUI {
                         (0..max_len).into_iter().map(|x| {
                             format!("[{}]", x)
                         }).for_each(|x| {
-                            draw_panel(ui, &format!("{}{}", getter_str, x), &x, scope_selectors);
+                            draw_panel(ui, &format!("{}{}", getter_str, x), &x, scope_selectors, variable_getter);
                         });
                     });
                 }
@@ -139,7 +132,7 @@ impl eframe::App for GUI {
                         }).map(|x| {
                             x.to_string()
                         }).for_each(|x| {
-                            draw_panel(&mut ui, &format!("{}{}", getter_str, x), &x, scope_selectors);
+                            draw_panel(&mut ui, &format!("{}{}", getter_str, x), &x, scope_selectors, variable_getter);
                         });
                     };
 
@@ -152,19 +145,27 @@ impl eframe::App for GUI {
                     }
                 }
                 Some(FieldsType::Terminal) => {
+                    let getter = Container::dynamic_getter(&getter_str).unwrap();
+
                     ui.horizontal(|ui| {
+                        let mut gs = variable_getter.get_getter_setter(getter);
+                        let gs = gs.getter_setter();
                         ui.label(format!("{}", new_section));
-                        ui.add(egui::DragValue::new(&mut 1E-9)
-                            .max_decimals(6)
-                            .speed(0.0)
-                            .clamp_range(f64::NEG_INFINITY..=f64::INFINITY));
+
+                        if let Some(mut gs) = gs {
+                            ui.add(egui::DragValue::from_get_set(&mut gs)
+                                .max_decimals(6)
+                                .speed(0.0)
+                                .clamp_range(f64::NEG_INFINITY..=f64::INFINITY));
+                        }
+
                         let idx = scope_selectors.iter().position(|x| if let Some(g) = x.getter {
                             g.to_string() == getter_str
                         } else {
                             false
                         });
 
-                        if ui.button(if idx.is_none() {"📈"} else {"📉"}).clicked() {
+                        if ui.button(if idx.is_none() {"📈"} else {"X"}).clicked() {
                             if let Some(idx) = idx {
                                 scope_selectors.remove(idx);
                             } else {
@@ -183,7 +184,7 @@ impl eframe::App for GUI {
 
         egui::SidePanel::right("right panel").show(ctx, |mut ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                draw_panel(ui, "", "", &mut self.channel_selector.selectors);
+                draw_panel(ui, "", "", &mut self.channel_selector.selectors, &mut self.variable_getter);
             });
         });
 
@@ -221,6 +222,8 @@ impl eframe::App for GUI {
 
             ctx.request_repaint();
         });
+
+        self.variable_getter.update();
 
         self.last_frame_time = Instant::now() - start;
     }
