@@ -378,7 +378,7 @@ mod app {
         let update = to_controller_update(&buffer, position, &config);
         let mut pwm_req = controller.update(&update, &config);
 
-        if update.phase_currents.max_magnitude() > 20.0 {
+        if update.phase_currents.max_magnitude() > config.hard_curr_limit {
             pwm_req.driver_enable = false;
         }
 

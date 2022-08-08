@@ -29,6 +29,7 @@ pub struct Config {
     pub pos_controller_k_p: f32,
 
     pub curr_limit: f32,
+    pub hard_curr_limit: f32,
 
     pub comp_matrix: [[f32; 8]; 8],
     pub comp_bias: [f32; 8]
@@ -55,6 +56,7 @@ impl Config {
             pos_controller_k_p: 15.0,
 
             curr_limit: 15.0,
+            hard_curr_limit: 30.0,
             comp_matrix: [
                 [ 1.1173, -0.8311,  0.2963, -0.3230,  0.0120,  0.0302,  0.0000,  0.0000],
                 [-1.0591,  0.9015, -0.3551,  0.2872, -0.0080, -0.0282,  0.0000,  0.0000],
