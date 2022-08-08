@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc::Sender;
 use remote_obj::prelude::*;
 
-use common::{HostToDevice, ContainerGetter, ContainerSetter, Container};
+use common::{HostToDevice, ContainerGetter, Container};
 use crate::comms::{ArbiterReq, GetterSetter, new_interface};
 
 use eframe::egui;
@@ -182,7 +182,7 @@ impl eframe::App for GUI {
             }
         }
 
-        egui::SidePanel::right("right panel").show(ctx, |mut ui| {
+        egui::SidePanel::right("right panel").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 draw_panel(ui, "", "", &mut self.channel_selector.selectors, &mut self.variable_getter);
             });

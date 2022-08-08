@@ -36,7 +36,7 @@ impl GetterSelector {
                     assert!(next_string.starts_with('['));
                     let r_bracket = next_string.find(']').unwrap();
                     let idx = next_string[1..r_bracket].parse::<usize>().ok().unwrap();
-
+                    assert!(idx < max_len);
                     indexes.push(idx + 1);
                     new_getter_string.push_str(&format!("[{}]", idx));
                 }

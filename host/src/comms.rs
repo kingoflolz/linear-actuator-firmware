@@ -159,7 +159,7 @@ impl ArbiterReq {
     }
 
     pub fn set_async(setter: ContainerSetter, sender: &Sender<ArbiterReq>) {
-        let (s, r) = channel();
+        let (s, _) = channel();
         let req = ArbiterReq::Setter(setter, s);
         sender.send(req).unwrap();
     }
