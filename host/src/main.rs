@@ -43,7 +43,8 @@ struct GUI {
     selected_channels: HashSet<ContainerGetter>,
 
     last_frame_time: Duration,
-    last_frame_auto_bounds: bool
+    last_frame_auto_bounds: bool,
+    start_time: Instant,
 }
 
 impl GUI {
@@ -62,7 +63,8 @@ impl GUI {
             channel_selector: ChannelSelector::new(),
             selected_channels: HashSet::new(),
             last_frame_time: Duration::ZERO,
-            last_frame_auto_bounds: false
+            last_frame_auto_bounds: false,
+            start_time: Instant::now()
         }
     }
 
@@ -226,6 +228,16 @@ impl eframe::App for GUI {
         self.variable_getter.update();
 
         self.last_frame_time = Instant::now() - start;
+
+        if let Some(mut pos_setpoint) = self.pos_setpoint.getter_setter() {
+            let time = self.start_time.elapsed().as_secs();
+
+            if time % 2 == 0 {
+                pos_setpoint(Some(20.0));
+            } else {
+                pos_setpoint(Some(-100.0));
+            }
+        }
     }
 }
 
