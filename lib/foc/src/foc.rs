@@ -18,14 +18,14 @@ pub struct PosController {
 }
 
 impl PosController {
-    fn update(&mut self, encoder: &EncoderOutput, config: &Config) -> f32 {
+    fn update(&mut self, encoder: &EncoderOutput, saturated: bool, config: &Config) -> f32 {
         self.vel_controller.k_i = config.vel_controller_k_i;
         self.vel_controller.p_controller.k_p = config.vel_controller_k_p;
         self.pos_controller.k_p = config.pos_controller_k_p;
 
         let velocity_setpoint = self.pos_controller.update(self.pos_setpoint - encoder.filtered_position);
         self.vel_setpoint = velocity_setpoint;
-        return self.vel_controller.update(encoder.velocity - self.vel_setpoint);
+        return self.vel_controller.update(encoder.velocity - self.vel_setpoint, saturated);
     }
 }
 
@@ -37,6 +37,8 @@ pub struct FieldOrientedControl {
     current_controller: DQCurrentController,
     dq_currents: DQCurrents,
     q_req: f32,
+    #[remote(skip)]
+    saturated: bool,
     pos_controller: PosController,
     encoder_output: EncoderOutput,
 }
@@ -48,6 +50,7 @@ impl FieldOrientedControl {
             current_controller: DQCurrentController::new(config),
             dq_currents: DQCurrents::default(),
             q_req: 0.0,
+            saturated: false,
             pos_controller: PosController {
                 vel_controller: PIController::new(config.vel_controller_k_i, config.vel_controller_k_p),
                 pos_controller: PController::new(config.pos_controller_k_p),
@@ -73,8 +76,10 @@ impl FieldOrientedControl {
         //      q: config.open_loop_voltage
         // };
 
-        let q = self.pos_controller.update(encoder_output, config);
+        let q = self.pos_controller.update(encoder_output, self.saturated, config);
         let q = q.max(-config.curr_limit).min(config.curr_limit);
+
+        self.saturated = q == config.curr_limit || q == -config.curr_limit;
 
         let voltage_request = self.current_controller.update(
             &dq_currents,

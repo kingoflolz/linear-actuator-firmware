@@ -36,8 +36,10 @@ impl PIController {
         }
     }
 
-    pub fn update(&mut self, error: f32) -> f32 {
-        self.i_error += error;
+    pub fn update(&mut self, error: f32, saturated: bool) -> f32 {
+        if !saturated {
+            self.i_error += error;
+        }
         self.p_controller.update(error) + self.k_i * self.i_error
     }
 }
@@ -67,8 +69,8 @@ impl DQCurrentController {
         self.q_controller.p_controller.k_p = config.current_controller_k_p;
 
         DQVoltages {
-            d: -self.d_controller.update(-(current_inputs.d - current_requests.d)),
-            q: -self.q_controller.update(-(current_inputs.q - current_requests.q)),
+            d: -self.d_controller.update(-(current_inputs.d - current_requests.d), false),
+            q: -self.q_controller.update(-(current_inputs.q - current_requests.q), false),
         }
     }
 }

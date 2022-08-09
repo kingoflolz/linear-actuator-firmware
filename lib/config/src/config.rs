@@ -51,12 +51,12 @@ impl Config {
 
             current_controller_k_p: 0.22e-4,
             current_controller_k_i: 1000.0 * 60e-3 / 8e3,
-            vel_controller_k_p: 0.125,
-            vel_controller_k_i: 2.0 / 8e3,
-            pos_controller_k_p: 15.0,
+            vel_controller_k_p: 0.1,
+            vel_controller_k_i: 10.0 / 8e3,
+            pos_controller_k_p: 40.0,
 
-            curr_limit: 15.0,
-            hard_curr_limit: 30.0,
+            curr_limit: 22.5,
+            hard_curr_limit: 35.0,
             comp_matrix: [
                 [ 1.1173, -0.8311,  0.2963, -0.3230,  0.0120,  0.0302,  0.0000,  0.0000],
                 [-1.0591,  0.9015, -0.3551,  0.2872, -0.0080, -0.0282,  0.0000,  0.0000],
